@@ -1,0 +1,11 @@
+*.pdf
+*.un~
+*.o
+*.so
+*.swp
+*.ipynb_checkpoints
+*.png
+*.h5
+*.root
+*.pyc
+*__pycache__*
