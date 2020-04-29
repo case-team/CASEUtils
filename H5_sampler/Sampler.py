@@ -23,12 +23,16 @@ class Sampler():
             exit(1)
         if(self.nSample < 1): return []
         with h5py.File(self.filename, "r") as h5_file:
-            out = h5_file[key].value[self.sample_idxs]
+            out = h5_file[key][()][self.sample_idxs]
             return out
 
 class BlackBox():
-    def __init__(self, samplers, keys):
+    def __init__(self, samplers, keys = []):
         self.data = dict()
+        if(len(keys) == 0):
+            #empty list means keep everything
+            keys = (samplers[0]).keys
+            keys.remove('preselection_eff')
         self.keys = keys
 
         #Fill the data from the various samplers
