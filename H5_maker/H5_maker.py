@@ -211,6 +211,8 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
     count = 0
     saved = 0
 
+#----------------- Begin loop over files ---------------------------------
+
     for fileName in inputFileNames:
 
         print("Opening file %s" % fileName)
@@ -249,7 +251,8 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
 
 
 
-# -------- Begin Loop-------------------------------------
+# -------- Begin Loop over tree-------------------------------------
+
         entries = inTree.entries
         for entry in xrange(entries):
 
@@ -321,11 +324,13 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             saved+=1
             out.fill_event(inTree, jet1, jet2, jet3, PFCands, subjets, mjj)
             if(nEventsMax > 0 and saved >= nEventsMax): break
+# -------- End Loop over tree-------------------------------------
+# -------- End Loop over files-------------------------------------
 
-        efficiency = float(saved)/count
-        out.final_write_out(efficiency)
-        print("Done. Selected %i events. Selection efficiency is %.3f \n" % (saved, efficiency))
-        print("Outputed to %s" % outputFileName)
-        return saved
+    efficiency = float(saved)/count
+    out.final_write_out(efficiency)
+    print("Done. Selected %i events. Selection efficiency is %.3f \n" % (saved, efficiency))
+    print("Outputed to %s" % outputFileName)
+    return saved
 
 
