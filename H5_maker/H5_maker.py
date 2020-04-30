@@ -241,7 +241,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             inTree= InputTree(inTree) 
             print('Running over %i entries \n' % nTotal)
 
-        out = Outputer(outputFileName)
+        out = Outputer(outputFileName, truth_label =  process_flag)
 
 
         # Grab event tree from nanoAOD
