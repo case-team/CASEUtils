@@ -1,4 +1,5 @@
 from H5_maker import *
+import sys
 
 
 
@@ -144,13 +145,19 @@ qcd2000 = ("QCD_HT2000toInf", [
             ])
 
 
+def file_split(label, inputFiles, outputFileBase, year):
+    for idx,fname in enumerate(inputFiles):
+        try:
+            NanoReader(label, inputFileNames = [fname], outputFileName = outputFileBase + "_" + str(idx) + ".h5", year = year)
+        except:
+            print("Error for file %i:" % idx, sys.exc_info()[0])
 year = 2017
-outdir = ""
+outdir = "output_files/"
 
 #No PF cands ?
 #NanoReader(0, inputFileNames = zjets[1], outputFileName = outdir + zjets[0] + ".h5", year = year)
 #NanoReader(0, inputFileNames = wjets[1], outputFileName = outdir + wjets[0] + ".h5", year = year)
 #NanoReader(0, inputFileNames = ttbar[1], outputFileName = outdir + ttbar[0] + ".h5", year = year)
-NanoReader(0, inputFileNames = qcd1000[1], outputFileName = outdir + qcd1000[0] + ".h5", year = year)
-NanoReader(0, inputFileNames = qcd1500[1], outputFileName = outdir + qcd1500[0] + ".h5", year = year)
-NanoReader(0, inputFileNames = qcd2000[1], outputFileName = outdir + qcd2000[0] + ".h5", year = year)
+file_split(0, qcd1000[1], outdir + qcd1000[0], year  = year)
+file_split(0, qcd1500[1], outdir + qcd1500[0], year  = year)
+file_split(0, qcd2000[1], outdir + qcd2000[0], year  = year)

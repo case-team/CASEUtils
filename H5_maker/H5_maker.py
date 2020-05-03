@@ -206,7 +206,6 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
     mjj_cut = 1200.
     
     nFiles = len(inputFileNames)
-    print((nFiles, outputFileName, process_flag))
     print("Will run over %i files and output to %s with truth label %i" % (nFiles, outputFileName, process_flag))
     count = 0
     saved = 0
