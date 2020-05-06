@@ -1,22 +1,27 @@
 from __future__ import print_function, division
+from optparse import OptionParser
 
 import h5py
 from ImageUtils import *
 import numpy as np
 
+parser = OptionParser()
+parser.add_option("--npix", default =32, type = int, help="Input file name")
+parser.add_option("-i", "--input", dest = 'fin_name',  default = 'test.h5', help="Input file name")
+parser.add_option("-o", "--output", dest='fout_name',  default = '', help="Output file name (leave blank for adding images to input file")
+options, args = parser.parse_args()
 
 # Load files
 batch_size = 5000
-fin_name = "../data/QCD_HT1000to1500_test.h5"
-fout_name = fin_name
-#fout_name = "../data/images_test.h5"
-excludes = ['jet1_PFCands', 'jet2_PFCands']
-npix = 40
+fin_name = options.fin_name
+fout_name = options.fout_name
+if(fout_name == ""): fout_name = fin_name
+excludes = []
+npix = options.npix
 img_width = 1.2
+rotate = False
+overwrite = True
 
-
-do_plots = False
-has_sig_bit = False
 
 if(fin_name != fout_name):
     #output to different file
@@ -35,13 +40,17 @@ else:
     #add jet images to existing file
     print("going to add jet images to file %s" %fin_name)
     fin = h5py.File(fin_name, 'r+')
+    if(overwrite):
+        if('j1_images' in fin.keys()):
+            print("deleting existing j1 images")
+            del fin['j1_images']
+        if('j2_images' in fin.keys()):
+            print("deleting existing j2 images")
+            del fin['j2_images']
     fout = fin
 
 total_size = fin[fin.keys()[0]].shape[0]
 iters = total_size//batch_size
-
-
-
 
 print("going to make jet images for %i events with batch size %i \n \n" % (total_size, batch_size))
 for i in range(iters):
@@ -60,8 +69,8 @@ for i in range(iters):
     j2_images = np.zeros((batch_size, npix, npix), dtype = np.float16)
     for j in range(end_idx - start_idx):
 
-        j1_image = make_image(j1_4vec[j], jet1_PFCands[j], npix = npix, img_width = img_width, norm = True)
-        j2_image = make_image(j2_4vec[j], jet2_PFCands[j], npix = npix, img_width = img_width, norm = True)
+        j1_image = make_image(j1_4vec[j], jet1_PFCands[j], npix = npix, img_width = img_width, norm = True, rotate = rotate)
+        j2_image = make_image(j2_4vec[j], jet2_PFCands[j], npix = npix, img_width = img_width, norm = True, rotate = rotate)
 
 
         j1_images[j] = j1_image
@@ -79,6 +88,9 @@ for i in range(iters):
 
 
 
+fin.close()
+if(fin_name != fout_name):
+    fout.close()
 print("Finished all batches! Output file saved to %s" %(fout_name))
 
 

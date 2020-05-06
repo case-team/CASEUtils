@@ -15,4 +15,4 @@ BB = BlackBox(ws, keys)
 #print(BB['truth_label'].shape)
 #print(BB['jet_kinematics'].shape)
 
-BB.writeOut('BB_test.h5')
+BB.writeOut('BB_test_Wprime.h5')

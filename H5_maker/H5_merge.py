@@ -19,22 +19,37 @@ def merge(fin_name, fout_name):
         print("skipping this dataset")
         return
 
-    fin_keys.remove("preselection_eff")
-    n_fin = float(fin[fin_keys[0]].shape[0])
-    n_fout = float(fout[fin_keys[0]].shape[0])
-    #preselection efficiency is weighted average of two files
-    fout['preselection_eff'][0] = (n_fin * fin['preselection_eff'][0] + n_fout * fout['preselection_eff'][0]) / (n_fin + n_fout)
+    if('preselection_eff' in fin_keys):
+        fin_keys.remove("preselection_eff")
+        n_fin = float(fin[fin_keys[0]].shape[0])
+        n_fout = float(fout[fin_keys[0]].shape[0])
+        #preselection efficiency is weighted average of two files
+        fout['preselection_eff'][0] = (n_fin * fin['preselection_eff'][0] + n_fout * fout['preselection_eff'][0]) / (n_fin + n_fout)
+
     for key in fin_keys:
         append_h5(fout, key, fin[key])
 
+
+def my_copy(fin_name, fout_name):
+    fin = h5py.File(fin_name, "r")
+    fout = h5py.File(fout_name, "w")
+
+    fin_keys = fin.keys()
+
+    for key in fin_keys:
+        shape = list(fin[key].shape)
+        shape[0] = None
+        fout.create_dataset(key, data = fin[key], chunks = True, maxshape = shape, compression = 'gzip')
 
 
 
 def merge_multiple(fout_name, fs):
     print("Merging H5 files: ", fs)
     print("Dest %s" % fout_name)
-    os.system("cp %s %s" % (fs[0], fout_name))
+    #os.system("cp %s %s" % (fs[0], fout_name))
+    my_copy(fs[0], fout_name)
     for fin_name in fs[1:]:
+        print("Merging %s" % fin_name)
         merge(fin_name, fout_name)
 
 
