@@ -4,6 +4,7 @@ from optparse import OptionParser
 import h5py
 from ImageUtils import *
 import numpy as np
+import math
 
 parser = OptionParser()
 parser.add_option("--npix", default =32, type = int, help="Input file name")
@@ -50,7 +51,7 @@ else:
     fout = fin
 
 total_size = fin[fin.keys()[0]].shape[0]
-iters = total_size//batch_size
+iters = int(math.ceil(total_size/batch_size))
 
 print("going to make jet images for %i events with batch size %i \n \n" % (total_size, batch_size))
 for i in range(iters):
