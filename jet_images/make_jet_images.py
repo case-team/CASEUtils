@@ -51,9 +51,9 @@ else:
     fout = fin
 
 total_size = fin[fin.keys()[0]].shape[0]
-iters = int(math.ceil(total_size/batch_size))
+iters = int(math.ceil(float(total_size)/batch_size))
 
-print("going to make jet images for %i events with batch size %i \n \n" % (total_size, batch_size))
+print("going to make jet images for %i events with batch size %i (%i batches) \n \n" % (total_size, batch_size, iters))
 for i in range(iters):
 
     print("batch %i \n" %i)
@@ -66,8 +66,8 @@ for i in range(iters):
     j1_4vec = fin['jet_kinematics'][start_idx:end_idx,2:6]
     j2_4vec = fin['jet_kinematics'][start_idx:end_idx,6:10]
 
-    j1_images = np.zeros((batch_size, npix, npix), dtype = np.float16)
-    j2_images = np.zeros((batch_size, npix, npix), dtype = np.float16)
+    j1_images = np.zeros((end_idx - start_idx, npix, npix), dtype = np.float16)
+    j2_images = np.zeros((end_idx - start_idx, npix, npix), dtype = np.float16)
     for j in range(end_idx - start_idx):
 
         j1_image = make_image(j1_4vec[j], jet1_PFCands[j], npix = npix, img_width = img_width, norm = True, rotate = rotate)
