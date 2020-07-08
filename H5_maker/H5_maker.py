@@ -47,17 +47,18 @@ class Outputer:
 
        GenParts_pdgId=inTree.readBranch('GenPart_pdgId')
        GenParts_status=inTree.readBranch('GenPart_status')
+       GenParts_mass=inTree.readBranch('GenPart_mass')
        nGenParts=inTree.readBranch('nGenPart')       
       
        for p in range(nGenParts):
-        if abs(GenParts_pdgId[p]) > 11 and abs(GenParts_pdgId[p]) < 18:
-	 return True
+        if abs(GenParts_pdgId[p]) > 11 and abs(GenParts_pdgId[p]) < 18 and GenParts_mass[p]>0: return True
          
        return False
 
 
     def fill_event(self, inTree, jet1, jet2, jet3, PFCands, subjets, mjj):
 
+        import sys
         genWeight = inTree.readBranch('genWeight')
         MET = inTree.readBranch('MET_pt')
         MET_phi = inTree.readBranch('MET_phi')
@@ -65,7 +66,7 @@ class Outputer:
 
 
         leptonic_decay = self.parse_gen_level(inTree)
-
+             
         event_info = [eventNum, MET, MET_phi, genWeight, leptonic_decay]
 
         d_eta = abs(jet1.eta - jet2.eta)
@@ -269,7 +270,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             count +=1
             # Grab the event
             event = Event(inTree, entry)
-            
+	    
             passTrigger = False
             passFilter = True
             for fil in filters:
