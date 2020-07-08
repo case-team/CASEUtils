@@ -1,5 +1,5 @@
 # Read nanoAOD with PF constituents (aka pancakes), apply a pre-selection and output to an H5 file format
-
+import sys
 import ROOT
 from ROOT import TLorentzVector, TFile
 import numpy as np
@@ -44,8 +44,17 @@ class Outputer:
 
 
     def parse_gen_level(self, inTree):
-    #TODO Implement this so it works for all types of signal models!
-        return 0
+    #TODO Implement this so it works for all types of signal models!        
+
+       GenParts_pdgId=inTree.readBranch('GenPart_pdgId')
+       GenParts_status=inTree.readBranch('GenPart_status')
+       nGenParts=inTree.readBranch('nGenPart')       
+      
+       for p in range(nGenParts):
+        if abs(GenParts_pdgId[p]) > 11 and abs(GenParts_pdgId[p]) < 18:
+	 return True
+         
+       return False
 
 
     def fill_event(self, inTree, jet1, jet2, jet3, PFCands, subjets, mjj):
@@ -261,9 +270,6 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             count +=1
             # Grab the event
             event = Event(inTree, entry)
-
-
-
             
             passTrigger = False
             passFilter = True
