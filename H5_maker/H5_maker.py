@@ -43,8 +43,24 @@ class Outputer:
         self.event_info = np.zeros((self.batch_size, 5), dtype=np.float32)
 
 
-    def parse_gen_level(self, inTree):
-    #TODO Implement this so it works for all types of signal models!
+    def is_leptonic_decay(self, inTree):
+    #leptonic decays = generator level lepton coming from a particle with mass > 20 GeV
+    #not perfect but works pretty well testing on Wkk and W' grav samples
+
+        GenParts_pdgId=inTree.readBranch('GenPart_pdgId')
+        GenParts_status=inTree.readBranch('GenPart_status')
+        GenParts_mass=inTree.readBranch('GenPart_mass')
+        GenParts_mother=inTree.readBranch('GenPart_genPartIdxMother')
+        nGenParts=inTree.readBranch('nGenPart')       
+
+        for p in range(nGenParts):
+            m = GenParts_mother[p]
+            if abs(GenParts_pdgId[p]) > 11 and abs(GenParts_pdgId[p]) < 18 and  m > 0 and GenParts_mass[m]>20: 
+                #print("self id, status: %i %i" % (GenParts_pdgId[p], GenParts_status[p]))
+                #print("mom i, id, status: %i %i %i" % (m, GenParts_pdgId[m], GenParts_status[m]))
+                return True
+         
+        return False
         return 0
 
 
