@@ -7,7 +7,7 @@ import numpy as np
 import math
 
 parser = OptionParser()
-parser.add_option("--npix", default =32, type = int, help="Input file name")
+parser.add_option("--npix", default =32, type = int, help="Number of pixels")
 parser.add_option("-i", "--input", dest = 'fin_name',  default = 'test.h5', help="Input file name")
 parser.add_option("-o", "--output", dest='fout_name',  default = '', help="Output file name (leave blank for adding images to input file")
 options, args = parser.parse_args()
@@ -28,7 +28,7 @@ if(fin_name != fout_name):
     #output to different file
     fin = h5py.File(fin_name, 'r')
     fout = h5py.File(fout_name, 'w')
-    print("Going to copy all the data from %s to %s, will add jet images after ")
+    print("Going to copy all the data from %s to %s, will add jet images after " % (fin_name, fout_name))
     for key in fin.keys():
         if key in excludes:
             continue

@@ -26,8 +26,8 @@ class Outputer:
     def __init__(self, outputFileName="out.root", batch_size = 5000, truth_label = 0):
         self.batch_size = batch_size
         self.output_name = outputFileName
-        self.truth_label = np.array([[truth_label]]*batch_size, dtype=np.int8)
         self.first_write = False
+        self.truth_label = np.array([[truth_label]]*write_size, dtype=np.int8)
         self.idx = 0
         self.nBatch = 0
         self.n_pf_cands = 100 #how many PF candidates to save (max)
@@ -118,12 +118,14 @@ class Outputer:
         self.idx = 0
         print("Writing out batch %i \n" % self.nBatch)
         self.nBatch += 1
+        write_size = self.event_info.shape[0]
+        truth_label_write = self.truth_label[:write_size]
 
         if(not self.first_write):
             self.first_write = True
             print("First write, creating dataset with name %s \n" % self.output_name)
             with h5py.File(self.output_name, "w") as f:
-                f.create_dataset("truth_label", data=self.truth_label, chunks = True, maxshape=(None,1))
+                f.create_dataset("truth_label", data=truth_label_write, chunks = True, maxshape=(None,1))
                 f.create_dataset("event_info", data=self.event_info, chunks = True, maxshape=(None, self.event_info.shape[1]))
                 f.create_dataset("jet_kinematics", data=self.jet_kinematics, chunks = True, maxshape=(None, self.jet_kinematics.shape[1]))
                 f.create_dataset("jet1_extraInfo", data=self.jet1_extraInfo, chunks = True, maxshape=(None, self.jet1_extraInfo.shape[1]))
@@ -133,7 +135,7 @@ class Outputer:
 
         else:
             with h5py.File(self.output_name, "a") as f:
-                append_h5(f,'truth_label',self.truth_label)
+                append_h5(f,'truth_label',truth_label_write)
                 append_h5(f,'event_info',self.event_info)
                 append_h5(f,'jet_kinematics',self.jet_kinematics)
                 append_h5(f,'jet1_extraInfo',self.jet1_extraInfo)
