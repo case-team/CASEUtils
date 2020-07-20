@@ -51,43 +51,38 @@ class BlackBox():
     def __init__(self, samplers, keys = []):
         self.data = dict()
         self.holdout = dict()
+        self.samplers = samplers
         if(len(keys) == 0):
             #empty list means keep everything
-            keys = (samplers[0]).keys
-            keys.remove('preselection_eff')
-        self.keys = keys
+            self.keys = (self.samplers[0]).keys
+            self.keys.remove('preselection_eff')
+        else:
+            self.keys = keys
 
         self.nEvents = 0
-        for sample in samplers:
+        for sample in self.samplers:
             self.nEvents += sample.nSample
 
         self.nHoldOut = 0
-        for sample in samplers:
+        for sample in self.samplers:
             self.nHoldOut += sample.nHoldOut
 
         print("Creating a blackbox with %i events" % self.nEvents)
         shuffle_order = np.arange(self.nEvents)
         np.random.shuffle(shuffle_order)
         #Fill the data from the various samplers
-        for key in keys:
+        for key in self.keys:
             print("Getting data for key %s " % key)
-            for i,sam in enumerate(samplers):
+            for i,sam in enumerate(self.samplers):
                 if(i==0): 
                     self.data[key] = sam.sample(key)
-                    if(self.nHoldOut > 0):
-                        self.holdout[key] = sam.holdout(key)
 
                 else: 
                     self.data[key] = np.append(self.data[key], sam.sample(key), axis = 0)
-                    if(self.nHoldOut > 0):
-                        self.holdout[key] = np.append(self.holdout[key], sam.holdout(key), axis = 0)
 
             #Shuffle the order
             self.data[key] = self.data[key][shuffle_order]
-            if(self.nHoldOut > 0):
-                holdout_order = np.arange(self.nHoldOut)
-                np.random.shuffle(holdout_order)
-                self.holdout[key] = self.holdout[key][holdout_order]
+
 
 
     def __getitem__(self, key):
@@ -107,8 +102,20 @@ class BlackBox():
 
     def writeHoldOut(self, filename):
         if(self.nHoldOut <= 0):
-            print("No holdout events saved!")
+            print("No holdout events specified!")
             return
+        for key in self.keys:
+            for i,sam in enumerate(self.samplers):
+                if(i==0):
+                    self.holdout[key] = sam.holdout(key)
+                else:
+                    self.holdout[key] = np.append(self.holdout[key], sam.holdout(key), axis = 0)
+
+                #shuffle
+                holdout_order = np.arange(self.nHoldOut)
+                np.random.shuffle(holdout_order)
+                self.holdout[key] = self.holdout[key][holdout_order]
+
         print("Writing out file with holdouts to %s" % filename)
         with h5py.File(filename, "w") as f:
             for key in self.keys:

@@ -147,6 +147,7 @@ qcd2000 = ("QCD_HT2000toInf", [
 
 def file_split(label, inputFiles, outputFileBase, year):
     for idx,fname in enumerate(inputFiles):
+        print("Starting file %s \n" % fname)
         try:
             NanoReader(label, inputFileNames = [fname], outputFileName = outputFileBase + "_" + str(idx) + ".h5", year = year)
         except:
@@ -155,9 +156,9 @@ year = 2017
 outdir = "output_files/"
 
 #No PF cands ?
-#NanoReader(0, inputFileNames = zjets[1], outputFileName = outdir + zjets[0] + ".h5", year = year)
-#NanoReader(0, inputFileNames = wjets[1], outputFileName = outdir + wjets[0] + ".h5", year = year)
-#NanoReader(0, inputFileNames = ttbar[1], outputFileName = outdir + ttbar[0] + ".h5", year = year)
-file_split(0, qcd1000[1], outdir + qcd1000[0], year  = year)
-file_split(0, qcd1500[1], outdir + qcd1500[0], year  = year)
-file_split(0, qcd2000[1], outdir + qcd2000[0], year  = year)
+#NanoReader(-2, inputFileNames = zjets[1], outputFileName = outdir + zjets[0] + ".h5", year = year)
+#NanoReader(-3, inputFileNames = wjets[1], outputFileName = outdir + wjets[0] + ".h5", year = year)
+#NanoReader(-1, inputFileNames = ttbar[1], outputFileName = outdir + ttbar[0] + ".h5", year = year)
+#file_split(0, qcd1000[1], outdir + qcd1000[0], year  = year)
+#file_split(0, qcd1500[1], outdir + qcd1500[0], year  = year)
+#file_split(0, qcd2000[1], outdir + qcd2000[0], year  = year)
