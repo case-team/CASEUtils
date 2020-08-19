@@ -27,7 +27,7 @@ class Outputer:
         self.batch_size = batch_size
         self.output_name = outputFileName
         self.first_write = False
-        self.truth_label = np.array([[truth_label]]*write_size, dtype=np.int8)
+        self.truth_label = np.array([[truth_label]]*batch_size, dtype=np.int8)
         self.idx = 0
         self.nBatch = 0
         self.n_pf_cands = 100 #how many PF candidates to save (max)
@@ -55,7 +55,7 @@ class Outputer:
 
         for p in range(nGenParts):
             m = GenParts_mother[p]
-            if abs(GenParts_pdgId[p]) > 11 and abs(GenParts_pdgId[p]) < 18 and  m > 0 and GenParts_mass[m]>20: 
+            if abs(GenParts_pdgId[p]) > 11 and abs(GenParts_pdgId[p]) < 18 and m > 0 and GenParts_mass[abs(m)]>20: 
                 #print("self id, status: %i %i" % (GenParts_pdgId[p], GenParts_status[p]))
                 #print("mom i, id, status: %i %i %i" % (m, GenParts_pdgId[m], GenParts_status[m]))
                 return True
@@ -72,7 +72,7 @@ class Outputer:
         eventNum = inTree.readBranch('event')
 
 
-        leptonic_decay = self.parse_gen_level(inTree)
+        leptonic_decay = self.is_leptonic_decay(inTree)
 
         event_info = [eventNum, MET, MET_phi, genWeight, leptonic_decay]
 
