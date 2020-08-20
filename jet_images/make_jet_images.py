@@ -28,7 +28,7 @@ overwrite = True
 if(fin_name != fout_name):
     #output to different file
     print("Going to copy all the data from %s to %s, will add jet images after " % (fin_name, fout_name))
-    if(len(excludes == 0):
+    if(len(excludes) == 0):
         os.system("cp %s %s" % (fin_name, fout_name))
         fin = h5py.File(fin_name, 'r')
         fout = h5py.File(fout_name, 'w')
