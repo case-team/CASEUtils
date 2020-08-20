@@ -1,6 +1,5 @@
 import numpy as np
 import math
-import matplotlib.pyplot as plt
 import ctypes
 import ROOT
 
@@ -105,6 +104,7 @@ def pixelate(jet, npix=40, img_width=1.0, rotate = True, norm=True):
     mask[eta_indices >= npix] = False
     mask[phi_indices >= npix] = False
 
+    #print(zip(eta_indices,phi_indices))
     #print(np.mean(mask))
     eta_indices = eta_indices[mask].astype(int)
     phi_indices = phi_indices[mask].astype(int)
@@ -116,8 +116,10 @@ def pixelate(jet, npix=40, img_width=1.0, rotate = True, norm=True):
     # L1-normalize the pt channels of the jet image
     if norm:
         normfactor = np.sum(jet_image)
-        if normfactor == 0:
+        if normfactor <= 0.:
             print(jet)
+            print(zip(eta_indices,phi_indices))
+            print(jet_image)
             raise FloatingPointError('Image had no particles!')
         else: 
             jet_image /= normfactor
