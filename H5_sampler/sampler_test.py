@@ -6,10 +6,11 @@ pbTofb = 1000.
 bkg_holdout_frac = 0.05
 sig_holdout_frac = 0.2
 nBatches = 2
-qcd1 = Sampler("../H5_maker/test_files/QCD_HT1000to1500_test.h5", pbTofb * 1088., 1., holdout_frac = bkg_holdout_frac)
-qcd2 = Sampler("../H5_maker/test_files/QCD_HT1500to2000_test.h5", pbTofb * 99.11, 1., holdout_frac = bkg_holdout_frac)
-qcd3 = Sampler("../H5_maker/test_files/QCD_HT2000toInf_test.h5", pbTofb * 20.23, 1., holdout_frac = bkg_holdout_frac)
-sig = Sampler("../H5_maker/test_files/WprimeToWZToWhadZhad_narrow_M-3500_TuneCP5_13TeV-madgraph_test.h5", 20000., 1., isSignal = True, holdout_frac = sig_holdout_frac)
+lumi = 1.
+qcd1 = Sampler("../H5_maker/test_files/QCD_HT1000to1500_test.h5", pbTofb * 1088., lumi, holdout_frac = bkg_holdout_frac)
+qcd2 = Sampler("../H5_maker/test_files/QCD_HT1500to2000_test.h5", pbTofb * 99.11, lumi, holdout_frac = bkg_holdout_frac)
+qcd3 = Sampler("../H5_maker/test_files/QCD_HT2000toInf_test.h5", pbTofb * 20.23, lumi, holdout_frac = bkg_holdout_frac)
+sig = Sampler("../H5_maker/test_files/WprimeToWZToWhadZhad_narrow_M-3500_TuneCP5_13TeV-madgraph_test.h5", 20000.,lumi, isSignal = True, holdout_frac = sig_holdout_frac)
 
 ws = [qcd1, qcd2, qcd3, sig]
 #ws = [qcd1]

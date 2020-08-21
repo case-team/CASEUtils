@@ -31,7 +31,7 @@ if(fin_name != fout_name):
     if(len(excludes) == 0):
         os.system("cp %s %s" % (fin_name, fout_name))
         fin = h5py.File(fin_name, 'r')
-        fout = h5py.File(fout_name, 'w')
+        fout = h5py.File(fout_name, 'a')
     else:
         fin = h5py.File(fin_name, 'r')
         fout = h5py.File(fout_name, 'w')
