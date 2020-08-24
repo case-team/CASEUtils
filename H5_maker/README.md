@@ -38,8 +38,8 @@ The data in each keys are:
 **truth\_label** :  single int. Labels  the type of event. 0 is QCD, signals are => 1 (depends on dataset), other backgrounds are TBD but will be < 0
 
 **event\_info** : 6 floats. [eventNum, MET, MET\_phi, genWeight, leptonic\_decay]
-leptonic decay is a flag (current not set!) that will check the generator level
-decay to see if it is leptonic, semi-leptonic or full hadronic
+leptonic decay is a flag that will check the generator level
+decay to see if it is leptonic / semi-leptonic or not (1 for leptonic, 0 for full hadronic)
 
 **jet\_kinematics** :  14 floats. Mjj, delta\_eta (between j1 and j2), followed by the 4 vectors of j1, j2 and j3  in pt,eta,phi,m\_softdrop format (if no 3rd jet passing cuts, zeros)
 
