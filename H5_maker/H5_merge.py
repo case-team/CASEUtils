@@ -46,8 +46,8 @@ def my_copy(fin_name, fout_name):
 def merge_multiple(fout_name, fs):
     print("Merging H5 files: ", fs)
     print("Dest %s" % fout_name)
-    #os.system("cp %s %s" % (fs[0], fout_name))
-    my_copy(fs[0], fout_name)
+    os.system("cp %s %s" % (fs[0], fout_name))
+    #my_copy(fs[0], fout_name)
     for fin_name in fs[1:]:
         print("Merging %s" % fin_name)
         merge(fin_name, fout_name)

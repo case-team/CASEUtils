@@ -14,14 +14,15 @@ sig = Sampler("../H5_maker/test_files/WprimeToWZToWhadZhad_narrow_M-3500_TuneCP5
 
 ws = [qcd1, qcd2, qcd3, sig]
 #ws = [qcd1]
-#keys= ['event_info', 'jet_kinematics', 'truth_label', 'jet1_extraInfo', 'jet1_PFCands']
-keys= []
+keys= ['event_info', 'jet_kinematics', 'truth_label', 'jet1_extraInfo', 'jet1_PFCands']
+#keys= []
 BB = BlackBox(ws, keys, nBatches = nBatches)
 #print(BB['truth_label'].shape)
 #print(BB['jet_kinematics'].shape)
 
-BB.writeOut('BB_test_Wprime')
+#BB.writeOut('BB_test_Wprime')
 BB.writeHoldOut('BB_test_Wprime_holdout.h5')
+exit(1)
 
 f1 = h5py.File("BB_test_Wprime_batch0.h5", "r")
 f2 = h5py.File("BB_test_Wprime_batch1.h5", "r")

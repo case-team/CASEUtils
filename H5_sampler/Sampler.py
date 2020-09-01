@@ -7,7 +7,7 @@ class Sampler():
         with h5py.File(self.filename, "r") as h5_file:
             self.eff_xsec = xsec * h5_file['preselection_eff'][0]
             self.keys = h5_file.keys()
-            self.nEvents = h5_file[self.keys[0]].shape[0]
+            self.nEvents = h5_file['event_info'].shape[0]
         self.nSample = int(lumi * self.eff_xsec)
         
         if(isSignal): self.nSample = int(lumi * xsec)
@@ -62,7 +62,7 @@ class Sampler():
             exit(1)
         if(self.nHoldOut == 0): return []
         with h5py.File(self.filename, "r") as h5_file:
-            out = h5_file[key][self.n_to_sample_from:]
+            out = h5_file[key][self.n_to_sample_from:self.nEvents]
             return out
 
 

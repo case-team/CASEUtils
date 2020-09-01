@@ -11,9 +11,9 @@ np.random.seed(options.seed)
 
 pbTofb = 1000.
 lumi = 41.5
-n_sig = 10000.
+n_sig = 50000.
 bkg_holdout_frac = 0.01
-sig_holdout_frac = 0.5
+sig_holdout_frac = 0.1
 keys = ['event_info', 'jet1_PFCands', 'jet1_extraInfo', 'jet2_PFCands', 'jet2_extraInfo', 'jet_kinematics',  'truth_label']
 
 
@@ -38,14 +38,10 @@ sig2 = Sampler(sig2_name, n_sig, 1., isSignal = True, holdout_frac = sig_holdout
 sig3 = Sampler(sig3_name, n_sig, 1., isSignal = True, holdout_frac = sig_holdout_frac)
 sig4 = Sampler(sig4_name, n_sig, 1., isSignal = True, holdout_frac = sig_holdout_frac)
 
-ws = [qcd1, qcd2, qcd3, sig1, sig2, sig3]
+ws = [qcd1, qcd2, qcd3, sig1, sig2, sig3, sig4]
 BB = BlackBox(ws, keys, nBatches = options.nBatch)
-os.system("mkdir %s" % out_dir)
-f_out_name = out_dir + 'BB'
-BB.writeOut(f_out_name)
+#os.system("mkdir %s" % out_dir)
+#f_out_name = out_dir + 'BB'
+#BB.writeOut(f_out_name)
 h_name = out_dir + "BB_testset"
 BB.writeHoldOut(h_name + ".h5")
-#for i in range(options.nBatch):
-#    os.system("python ../jet_images/make_jet_images.py -i %s_batch%i.h5 -o %s_batch%i_images.h5 " % (f_out_name, i,  f_out_name, i))
-#
-#os.system("python ../jet_images/make_jet_images.py -i %s.h5 -o %s_images.h5 " % (h_name, h_name))
