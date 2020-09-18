@@ -43,10 +43,10 @@ decay to see if it is leptonic / semi-leptonic or not (1 for leptonic, 0 for ful
 
 **jet\_kinematics** :  14 floats. Mjj, delta\_eta (between j1 and j2), followed by the 4 vectors of j1, j2 and j3  in pt,eta,phi,m\_softdrop format (if no 3rd jet passing cuts, zeros)
 
-**j1(2)\_extraInfo** :  7 floats. 4 nsubjettiness scores (tau\_i), followed by LSF3,
+**jet1(2)\_extraInfo** :  7 floats. 4 nsubjettiness scores (tau\_i), followed by LSF3,
 btag score (max deepB score of ak4 subjets) and number of PF constituents for j1 (j2)
 
-**j1(2)\_PFCands** : 400 floats. 4 vectors of (up to) 100 PFCands of j1 (j2) in  Px, Py, Pz, E  format. Zero
+**jet1(2)\_PFCands** : 400 floats. 4 vectors of (up to) 100 PFCands of j1 (j2) in  Px, Py, Pz, E  format. Zero
 padded
 
 
