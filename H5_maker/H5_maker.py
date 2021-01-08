@@ -37,9 +37,9 @@ class Outputer:
         self.idx = 0
         self.jet1_PFCands = np.zeros((self.batch_size, self.n_pf_cands,4), dtype=np.float16)
         self.jet2_PFCands = np.zeros((self.batch_size, self.n_pf_cands, 4), dtype=np.float16)
-        self.jet1_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float16)
-        self.jet2_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float16)
-        self.jet_kinematics = np.zeros((self.batch_size, 14), dtype=np.float16)
+        self.jet1_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
+        self.jet2_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
+        self.jet_kinematics = np.zeros((self.batch_size, 14), dtype=np.float32)
         self.event_info = np.zeros((self.batch_size, 5), dtype=np.float32)
 
 
@@ -56,8 +56,6 @@ class Outputer:
         for p in range(nGenParts):
             m = GenParts_mother[p]
             if abs(GenParts_pdgId[p]) > 11 and abs(GenParts_pdgId[p]) < 18 and m > 0 and GenParts_mass[abs(m)]>20: 
-                #print("self id, status: %i %i" % (GenParts_pdgId[p], GenParts_status[p]))
-                #print("mom i, id, status: %i %i %i" % (m, GenParts_pdgId[m], GenParts_status[m]))
                 return True
          
         return False
