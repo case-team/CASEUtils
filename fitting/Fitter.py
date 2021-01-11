@@ -23,10 +23,11 @@ class Fitter(object):
         self.cache.Close()
         self.cache.Delete()
 
-    def importBinnedData(self,histogram,poi = ["x"],name = "data"):
+    def importBinnedData(self,histogram,poi = ["x"],name = "data", regions=[]):
         cList = ROOT.RooArgList()
         for i,p in enumerate(poi):
-            cList.add(self.w.var(p))
+            var = self.w.var(p)
+            cList.add(var)
             if i==0:
                 axis=histogram.GetXaxis()
             elif i==1:
@@ -43,11 +44,15 @@ class Fitter(object):
             for i in range(1,bins+2):
                 #v = mmin + i * (mmax-mmin)/float(N)
                 binningx.append(axis.GetBinLowEdge(i))
-            self.w.var(p).setMin(mini)
-            self.w.var(p).setMax(maxi)
+            if(len(regions) == 0):
+                var.setMin(mini)
+                var.setMax(maxi)
+            else:
+                for reg_name,reg_low,reg_high in regions:
+                    var.setRange(reg_name, reg_low, reg_high)
             if(self.debug): 
                 print " set binning "+str(binningx)
-            self.w.var(p).setBinning(ROOT.RooBinning(len(binningx)-1,array("d",binningx)))
+            var.setBinning(ROOT.RooBinning(len(binningx)-1,array("d",binningx)))
             #a = self.w.var(p).getBinning()
             #for b in range(0,a.numBins()+1):
                 #print a.binLow(b)
