@@ -90,7 +90,7 @@ if __name__ == "__main__":
         framePulls.addPlotable(hpull,"X0 P E1")
         
         dataset.plotOn(frame,ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson),ROOT.RooFit.Name("data_qcd"),ROOT.RooFit.XErrorSize(0),ROOT.RooFit.Binning(roobins))
-        my_chi2,my_ndof = calculateChi2(histos_sb,nPars,hpull)
+        my_chi2,my_ndof = calculateChi2(hpull,nPars)
         my_prob = ROOT.TMath.Prob(my_chi2,my_ndof)
         PlotFitResults(frame,fres.GetName(),nPars,framePulls,"data_qcd","model_b",my_chi2,my_ndof, str(nPars) + "par_qcd_fit_binned_blinded" , plot_dir)
         

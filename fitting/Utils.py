@@ -158,27 +158,25 @@ def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_name,chi2,ndof,canvna
     c1.SaveAs(plot_dir + canvname)
     #c1.SaveAs(canvname.replace("png","C"),"C")
 
-def calculateChi2(hdata,nPars,g_pulls):
+def calculateChi2(g_pulls, nPars):
      
     NumberOfVarBins = 0
     NumberOfObservations_VarBin = 0
     chi2_VarBin = 0.
      
-    g_pulls.Print("all")
 
     a_x = array('d', [0.])
-    a_pull = array('d', [0.])
+    a_val = array('d', [0.])
     for p in range (0,g_pulls.GetN()):
     
-         g_pulls.GetPoint(p, a_x, a_pull)
-         x = a_x[0]
-         pull = a_pull[0]
-         data = hdata.GetBinContent(p+1)
-         print x,pull,data
+        g_pulls.GetPoint(p, a_x, a_val)
+        x = a_x[0]
+        pull = a_val[0]
+
+        print x,pull
          
-         if (data>0):
-            NumberOfObservations_VarBin+=1
-            chi2_VarBin += pow(pull,2)
+        NumberOfObservations_VarBin+=1
+        chi2_VarBin += pow(pull,2)
             
     ndf_VarBin = NumberOfObservations_VarBin - nPars
     return chi2_VarBin,ndf_VarBin
@@ -195,7 +193,7 @@ def load(iFile,iVar,iName,iHist,iCut):
 def roundTo(arr, base):
     for i in range(len(arr)):
         x = arr[i]
-        new_x = int(base * round(float(x)/base))
+        new_x = int(base * round(float(x)/base)) + base/2
         arr[i] = new_x
 
 
@@ -245,7 +243,7 @@ def check_rough_sig(h_file, m_low, m_high):
     print("Mjj window %f to %f " % (m_low, m_high))
     print("S = %i, B = %i, S/B %f, sigificance ~ %.1f " % (S, B, float(S)/B, S/np.sqrt(B)))
     
-def checkSBFit(filename,quantile,roobins,plotname, nPars):
+def checkSBFit(filename,quantile,roobins,plotname, nPars, plot_dir):
     
     fin = ROOT.TFile.Open(filename,'READ')
     workspace = fin.w
@@ -270,7 +268,7 @@ def checkSBFit(filename,quantile,roobins,plotname, nPars):
     frame3.addPlotable(hpull,"X0 P E1")
     
     data.plotOn(frame,ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson), ROOT.RooFit.Binning(roobins),ROOT.RooFit.Name("data_obs"),ROOT.RooFit.XErrorSize(0))
-    chi2,ndof = calculateChi2(data,nPars,hpull)
+    chi2,ndof = calculateChi2(hpull, nPars)
     PlotFitResults(frame,fres.GetName(),nPars,frame3,"data_obs","model_s",chi2,ndof,'sbFit_'+plotname, plot_dir)
 
 

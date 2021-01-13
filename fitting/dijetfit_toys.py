@@ -149,7 +149,7 @@ if __name__ == "__main__":
         framePulls.addPlotable(hpull,"X0 P E1")
         
         dataset.plotOn(frame,ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson),ROOT.RooFit.Name("data_qcd"),ROOT.RooFit.XErrorSize(0),ROOT.RooFit.Binning(roobins))
-        my_chi2,my_ndof = calculateChi2(histos_qcd,nPars,hpull)
+        my_chi2,my_ndof = calculateChi2(hpull, nPars)
         my_prob = ROOT.TMath.Prob(my_chi2,my_ndof)
         PlotFitResults(frame,fres.GetName(),nPars,framePulls,"data_qcd","model_b",my_chi2,my_ndof, str(nPars) + "par_qcd_fit_binned" , plot_dir)
         
@@ -281,7 +281,7 @@ if __name__ == "__main__":
         os.system(cmd)
 
         #run and visualize s+b fit as sanity check
-        checkSBFit('workspace_JJ_{l1}_{l2}.root'.format(l1=label,l2=toy_label),toy_label,roobins,label + "_" + toy_label)
+        checkSBFit('workspace_JJ_{l1}_{l2}.root'.format(l1=label,l2=toy_label),toy_label,roobins,label + "_" + toy_label, nPars, plot_dir)
         f_signif_name = 'higgsCombinesignificance_{l1}_{l2}.Significance.mH{mass:.0f}.root'.format(mass = mass, l1=label, l2 = toy_label)
         f_pval_name = 'higgsCombinepvalue_{l1}_{l2}.Significance.mH{mass:.0f}.root'.format(mass = mass, l1=label, l2 = toy_label)
 
