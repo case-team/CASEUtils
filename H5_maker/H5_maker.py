@@ -56,8 +56,6 @@ class Outputer:
         for p in range(nGenParts):
             m = GenParts_mother[p]
             if abs(GenParts_pdgId[p]) > 11 and abs(GenParts_pdgId[p]) < 18 and m > 0 and GenParts_mass[abs(m)]>20: 
-                #print("self id, status: %i %i" % (GenParts_pdgId[p], GenParts_status[p]))
-                #print("mom i, id, status: %i %i %i" % (m, GenParts_pdgId[m], GenParts_status[m]))
                 return True
          
         return False
