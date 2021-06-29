@@ -92,11 +92,11 @@ class BlackBox():
 
 
 
-    def writeOut(self, filename):
+    def writeOut(self, filename, batch_start =0):
 
         print("Creating a blackbox with %i events in %i batches" % (self.nEvents, self.nBatches))
         evts_per_batch = self.nEvents // self.nBatches
-        for i in range(self.nBatches):
+        for i in range(batch_start, self.nBatches):
             print("Starting batch %i \n" % i)
             shuffle_order = np.arange(evts_per_batch)
 
