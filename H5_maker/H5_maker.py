@@ -67,11 +67,7 @@ class Outputer:
         nGenParts=inTree.readBranch('nGenPart')       
 
         for p in range(nGenParts):
-            try:
-                m = GenParts_mother[p]
-            except:
-                import pdb; pdb.set_trace()
-                
+            m = GenParts_mother[p]
             if(m < 0 or abs(m) > nGenParts):
                 continue
             elif abs(GenParts_pdgId[p]) > 11 and abs(GenParts_pdgId[p]) < 18 and GenParts_mass[abs(m)]>20: 
@@ -330,7 +326,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             #PhotonsCol = Collection(event, "Photon")
             subjets = Collection(event, "SubJet")
 
-            min_pt = 200
+            jet_min_pt = 200
             #keep 2 jets with pt > 200, tight id
             jet1 = jet2 = jet3 =  None
         
@@ -339,7 +335,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             for jet in AK8Jets:
                 #jetId : bit1 = loose, bit2 = tight, bit3 = tightLepVeto
                 #want tight id
-                if((jet.jetId & 2 == 2) and jet.pt > min_pt and abs(jet.eta) < 2.5):
+                if((jet.jetId & 2 == 2) and jet.pt > jet_min_pt and abs(jet.eta) < 2.5):
                     jet.PFConstituents_Start = pf_conts_start
                     if(jet1 == None or jet.pt > jet1.pt):
                         jet3 = jet2
