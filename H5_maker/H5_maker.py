@@ -5,6 +5,7 @@ from ROOT import TLorentzVector, TFile
 import numpy as np
 import h5py
 from optparse import OptionParser
+import sys
 
 from PhysicsTools.NanoAODTools.postprocessing.framework.datamodel import *
 from PhysicsTools.NanoAODTools.postprocessing.framework.postprocessor import PostProcessor
@@ -22,10 +23,22 @@ def append_h5(f, name, data):
     f[name][prev_size:] = data
 
 
+def nPFCounter(index, event):
+    count = 0
+    jet_indices = event.FatJetPFCands_jetIdx
+    length = len(event.FatJetPFCands_jetIdx)
+    for i in range(length):
+        if jet_indices[i] == index:
+            count += 1
+    
+    return count
+
+
 class Outputer:
-    def __init__(self, outputFileName="out.root", batch_size = 5000, truth_label = 0):
+    def __init__(self, outputFileName="out.root", batch_size = 5000, truth_label = 0, sample_type="MC"):
         self.batch_size = batch_size
         self.output_name = outputFileName
+        self.sample_type = sample_type
         self.first_write = False
         self.truth_label = np.array([[truth_label]]*batch_size, dtype=np.int8)
         self.idx = 0
@@ -40,7 +53,7 @@ class Outputer:
         self.jet1_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
         self.jet2_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
         self.jet_kinematics = np.zeros((self.batch_size, 14), dtype=np.float32)
-        self.event_info = np.zeros((self.batch_size, 5), dtype=np.float32)
+        self.event_info = np.zeros((self.batch_size, 6), dtype=np.float32)
 
 
     def is_leptonic_decay(self, inTree):
@@ -54,8 +67,14 @@ class Outputer:
         nGenParts=inTree.readBranch('nGenPart')       
 
         for p in range(nGenParts):
-            m = GenParts_mother[p]
-            if abs(GenParts_pdgId[p]) > 11 and abs(GenParts_pdgId[p]) < 18 and m > 0 and GenParts_mass[abs(m)]>20: 
+            try:
+                m = GenParts_mother[p]
+            except:
+                import pdb; pdb.set_trace()
+                
+            if(m < 0 or abs(m) > nGenParts):
+                continue
+            elif abs(GenParts_pdgId[p]) > 11 and abs(GenParts_pdgId[p]) < 18 and GenParts_mass[abs(m)]>20: 
                 return True
          
         return False
@@ -64,15 +83,19 @@ class Outputer:
 
     def fill_event(self, inTree, jet1, jet2, jet3, PFCands, subjets, mjj):
 
-        genWeight = inTree.readBranch('genWeight')
+        if self.sample_type == "data":
+            genWeight = 1
+            leptonic_decay = False
+        else:
+            genWeight = inTree.readBranch('genWeight')
+            leptonic_decay = self.is_leptonic_decay(inTree)
+        
         MET = inTree.readBranch('MET_pt')
         MET_phi = inTree.readBranch('MET_phi')
         eventNum = inTree.readBranch('event')
+        run = inTree.readBranch('run')
 
-
-        leptonic_decay = self.is_leptonic_decay(inTree)
-
-        event_info = [eventNum, MET, MET_phi, genWeight, leptonic_decay]
+        event_info = [eventNum, MET, MET_phi, genWeight, leptonic_decay, run]
 
         d_eta = abs(jet1.eta - jet2.eta)
 
@@ -118,9 +141,9 @@ class Outputer:
 
 
         self.event_info[self.idx] = np.array(event_info, dtype=np.float32)
-        self.jet_kinematics[self.idx] = np.array(jet_kinematics, dtype = np.float16)
-        self.jet1_extraInfo[self.idx] = np.array(jet1_extraInfo, dtype = np.float16)
-        self.jet2_extraInfo[self.idx] = np.array(jet2_extraInfo, dtype = np.float16)
+        self.jet_kinematics[self.idx] = np.array(jet_kinematics, dtype = np.float32)
+        self.jet1_extraInfo[self.idx] = np.array(jet1_extraInfo, dtype = np.float32)
+        self.jet2_extraInfo[self.idx] = np.array(jet2_extraInfo, dtype = np.float32)
         self.jet1_PFCands[self.idx,:jet1.nPFConstituents] = np.array(jet1_PFCands, dtype = np.float16)
         self.jet2_PFCands[self.idx,:jet2.nPFConstituents] = np.array(jet2_PFCands, dtype = np.float16)
 
@@ -174,14 +197,12 @@ class Outputer:
             f.create_dataset("preselection_eff", data=np.array([eff]))
 
 
-
-
-
-
-
-
-def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.root", json = '', year = 2016, nEventsMax = -1):
-
+def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.root", json = '', year = 2016, nEventsMax = -1, sampleType = "MC"):
+    
+    if not ((sampleType == "MC") or (sampleType=="data")):
+        print("Error! sampleType needs to be set to either data or MC! Please set correct option and retry.")
+        sys.exit()
+    
     #Just tried to copy common filters, feel free to add any i am missing
     filters = ["Flag_goodVertices",
     "Flag_globalTightHalo2016Filter",
@@ -256,7 +277,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             inTree= InputTree(inTree) 
             print('Running over %i entries \n' % nTotal)
 
-        out = Outputer(outputFileName, truth_label =  process_flag)
+        out = Outputer(outputFileName, truth_label =  process_flag, sample_type=sampleType)
 
 
         # Grab event tree from nanoAOD
@@ -293,6 +314,16 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
 
 
             PFCands = Collection(event, "FatJetPFCands")
+                        
+            try:
+                mytest = event.FatJetPFCands_eta
+            except:
+                FullPFCands = Collection(event, "PFCands")
+                for cand in PFCands:
+                    cand.eta = FullPFCands[cand.pFCandsIdx].eta
+                    cand.phi = FullPFCands[cand.pFCandsIdx].phi
+                    cand.mass = FullPFCands[cand.pFCandsIdx].mass
+            
             AK8Jets = Collection(event, "FatJet")
             #MuonsCol = Collection(event, "Muon")
             #ElectronsCol = Collection(event, "Electron")
@@ -304,6 +335,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             jet1 = jet2 = jet3 =  None
         
             pf_conts_start = 0 #keep track of indices for PF candidates
+            jet_index = 0
             for jet in AK8Jets:
                 #jetId : bit1 = loose, bit2 = tight, bit3 = tightLepVeto
                 #want tight id
@@ -318,7 +350,18 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
                         jet2 = jet
                     elif(jet3 == None or jet.pt > jet3.pt):
                         jet3 = jet
-                pf_conts_start += jet.nPFConstituents
+                
+                
+                try:
+                    pf_conts_start += jet.nPFConstituents # try/except needed because FatJet_nPFConstituents isn't stored when using PFNano
+                except:
+                    jet.nPFConstituents = nPFCounter(jet_index, event)
+                    pf_conts_start += jet.nPFConstituents
+                
+                jet_index += 1
+            
+            
+            
 
             if(jet1 == None or jet2 == None): continue
 
@@ -335,6 +378,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             mjj = dijet.M()
 
             if(mjj< mjj_cut): continue
+        
 
             saved+=1
             out.fill_event(inTree, jet1, jet2, jet3, PFCands, subjets, mjj)

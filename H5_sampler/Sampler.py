@@ -92,11 +92,11 @@ class BlackBox():
 
 
 
-    def writeOut(self, filename):
+    def writeOut(self, filename, batch_start =0):
 
         print("Creating a blackbox with %i events in %i batches" % (self.nEvents, self.nBatches))
         evts_per_batch = self.nEvents // self.nBatches
-        for i in range(self.nBatches):
+        for i in range(batch_start, self.nBatches):
             print("Starting batch %i \n" % i)
             shuffle_order = np.arange(evts_per_batch)
 
@@ -109,12 +109,14 @@ class BlackBox():
             #Fill the data from the various samplers
             for key in self.keys:
                 print("Getting data for key %s " % key)
+                
                 for j,sam in enumerate(self.samplers):
                     if(j==0): 
                         self.data[key] = sam.sample(key)
 
-                    else: 
+                    else:
                         self.data[key] = np.append(self.data[key], sam.sample(key), axis = 0)
+
 
                 #Shuffle the order
                 self.data[key] = self.data[key][shuffle_order]
