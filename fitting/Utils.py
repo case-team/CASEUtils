@@ -50,7 +50,7 @@ def truncate(binning,mmin,mmax):
     return res
 
 
-def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_name,chi2,ndof,canvname, plot_dir):
+def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvname, plot_dir, has_sig = False):
 
     c1 =ROOT.TCanvas("c1","",800,800)
     c1.SetLogy()
@@ -96,7 +96,11 @@ def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_name,chi2,ndof,canvna
     legend2.SetFillStyle(0)
     legend2.SetMargin(0.35)
     legend.AddEntry(frame.findObject(data_name),"Data","lpe")
-    legend.AddEntry(frame.findObject(pdf_name),"%i par. background fit"%nPars,"l")
+    if(not has_sig): 
+        legend.AddEntry(frame.findObject(pdf_names[0]),"%i par. background fit"%nPars,"l")
+
+    else: 
+        legend.AddEntry(frame.findObject(pdf_names[0]),"Signal + Background Fit ","l")
     legend2.AddEntry("","","")
     legend2.AddEntry("","","")
     legend2.AddEntry("","","")
@@ -158,7 +162,7 @@ def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_name,chi2,ndof,canvna
     c1.SaveAs(plot_dir + canvname)
     #c1.SaveAs(canvname.replace("png","C"),"C")
 
-def calculateChi2(g_pulls, nPars):
+def calculateChi2(g_pulls, nPars, ranges = None):
      
     NumberOfVarBins = 0
     NumberOfObservations_VarBin = 0
@@ -173,13 +177,41 @@ def calculateChi2(g_pulls, nPars):
         x = a_x[0]
         pull = a_val[0]
 
-        print x,pull
+        #print x,pull
+
+        add = True
+        if(ranges is not None and len(ranges) > 0):
+            add = False
+            for range_ in ranges:
+                if(x >= range_[0] and x<= range_[1]):
+                    add = True
          
-        NumberOfObservations_VarBin+=1
-        chi2_VarBin += pow(pull,2)
+        if(add):
+            NumberOfObservations_VarBin+=1
+            chi2_VarBin += pow(pull,2)
             
     ndf_VarBin = NumberOfObservations_VarBin - nPars
     return chi2_VarBin,ndf_VarBin
+
+def apply_blinding(h, ranges = None):
+    if(ranges is None or len(ranges) == 0):
+        print("Must supply list of tuples specifying ranges to include")
+
+    h_clone = h.Clone(h.GetName() + "_blinded")
+    axis = h.GetXaxis()
+    for i in range(axis.GetNbins()):
+        low_edge = axis.GetBinLowEdge(i)
+        high_edge = axis.GetBinLowEdge(i)
+
+        inRange = False
+        for interval in ranges:
+            if(low_edge >= interval[0] and high_edge <= interval[1]):
+                inRange = True
+
+        if(not inRange):
+            h_clone.SetBinContent(i, 0.)
+            h_clone.SetBinError(i, 0.)
+    return h_clone
 
 def load(iFile,iVar,iName,iHist,iCut):
     lFile = ROOT.TFile(iFile)
@@ -198,37 +230,63 @@ def roundTo(arr, base):
 
 
 
-def fill_hist(v, h):
-    for x in v:
-        h.Fill(x)
+def fill_hist(v, h, event_num = None):
+    h.Sumw2()
+    #print("%i events in the dataset " % len(v))
+    if(event_num is None):
+        for x in v: h.Fill(x)
+    else:
+        e_dict = dict()
+        for idx,x in enumerate(v):
+            e_num = event_num[idx]
+            e_dict[e_num] = (x, e_dict.get(e_num, (0,0))[1] + 1)
+
+        print("%i unique events"% len(e_dict.keys()))
+        for k in e_dict.keys():
+            x = e_dict[k][0]
+            n = e_dict[k][1]
+            h.Fill(x,n)
+
+        print("%.0f filled events" % h.Integral())
+    #h.Print("range")
 
 
 
-def load_h5_sb(h_file, hist, sb1_edge = -1., sb2_edge = -1.):
+
+
+def load_h5_sb(h_file, hist, correctStats=False, sb1_edge = -1., sb2_edge = -1.):
+    event_num = None
     with h5py.File(h_file, "r") as f:
         mjj = np.array(f['mjj'][()])
-        if(sb1_edge > 0. and sb2_edge > 0.):
-            mask = (mjj < sb1_edge) |  (mjj > sb2_edge)
-            mjj = mjj[mask]
+        if(correctStats):
+            event_num = f['event_num'][()]
 
-    fill_hist(mjj, hist)
+    fill_hist(mjj, hist, event_num)
 
-def load_h5_bkg(h_file, hist):
+def load_h5_bkg(h_file, hist, correctStats = False):
+    event_num = None
     with h5py.File(h_file, "r") as f:
         mjj = f['mjj'][()]
         is_sig = f['truth_label'][()]
+        if(correctStats):
+            event_num = f['event_num'][()]
 
     mask = (is_sig < 0.1)
-    fill_hist(mjj[mask], hist)
+    if(correctStats): event_num = event_num[mask]
+    fill_hist(mjj[mask], hist, event_num)
 
 
-def load_h5_sig(h_file, hist, sig_mjj):
+def load_h5_sig(h_file, hist, sig_mjj, correctStats =False):
+    event_num = None
     with h5py.File(h_file, "r") as f:
         mjj = f['mjj'][()]
         is_sig = f['truth_label'][()]
+        if(correctStats):
+            event_num = f['event_num'][()]
 
     mask = (mjj > 0.8*sig_mjj) & (mjj < 1.2*sig_mjj) & (is_sig > 0.9)
-    fill_hist(mjj[mask], hist)
+    if(correctStats): event_num = event_num[mask]
+    fill_hist(mjj[mask], hist, event_num)
 
 def check_rough_sig(h_file, m_low, m_high):
     with h5py.File(h_file, "r") as f:
@@ -243,23 +301,50 @@ def check_rough_sig(h_file, m_low, m_high):
     print("Mjj window %f to %f " % (m_low, m_high))
     print("S = %i, B = %i, S/B %f, sigificance ~ %.1f " % (S, B, float(S)/B, S/np.sqrt(B)))
     
-def checkSBFit(filename,quantile,roobins,plotname, nPars, plot_dir):
+def checkSBFit(filename,label,roobins,plotname, nPars, plot_dir):
     
     fin = ROOT.TFile.Open(filename,'READ')
     workspace = fin.w
-    
-    model = workspace.pdf('model_s')
-    model.Print("v")
+
+    model_tot = workspace.pdf('model_s')
+    model_qcd = workspace.pdf('model_b')
+    model_sig = workspace.pdf('shapeSig_model_signal_mjj_JJ_%s' % label)
     var = workspace.var('mjj')
     data = workspace.data('data_obs')
+
+
+    #sig_norm_var_total = workspace.function('n_exp_binJJ_%s_proc_model_signal_mjj' % label).getVal()
+    #var.setRange("int_range", 1500., 6500)
+    #set_ = ROOT.RooArgSet(var)
+    #sig_norm_var_denom = model_sig.createIntegral(set_, set_, "int_range").getVal()
+
+    #sig_norm_var_coeff = sig_norm_var_total/ sig_norm_var_denom
+    #print(sig_norm_var_coeff, sig_norm_var_denom )
+    #sig_norm_var_coeff = 1e-4
+
+    #sig_norm_var = ROOT.RooRealVar("sig_norm_var", "Signal Normalization", sig_norm_var_coeff, sig_norm_var_coeff/100., sig_norm_var_coeff*100.)
+    #sig_norm_var.Print("v")
+
+    #sig_norm_pdf = ROOT.RooAddPdf("sig_norm", "Signal", ROOT.RooArgList(model_sig), ROOT.RooArgList(sig_norm_var))
+    #sig_norm_pdf.Print("v")
+
+
+    model = model_tot
+
+    model_tot.Print("v")
+
     
-    fres = model.fitTo(data,ROOT.RooFit.SumW2Error(0),ROOT.RooFit.Minos(0),ROOT.RooFit.Verbose(0),ROOT.RooFit.Save(1),ROOT.RooFit.NumCPU(8)) 
+    fres = model.fitTo(data,ROOT.RooFit.SumW2Error(1),ROOT.RooFit.Minos(0),ROOT.RooFit.Verbose(0),ROOT.RooFit.Save(1),ROOT.RooFit.NumCPU(8)) 
     #fres.Print()
     
     frame = var.frame()
     data.plotOn(frame,ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson), ROOT.RooFit.Binning(roobins),ROOT.RooFit.Name("data_obs"),ROOT.RooFit.Invisible())
-    model.getPdf('JJ_%s'%quantile).plotOn(frame,ROOT.RooFit.VisualizeError(fres,1),ROOT.RooFit.FillColor(ROOT.kRed-7),ROOT.RooFit.LineColor(ROOT.kRed-7),ROOT.RooFit.Name(fres.GetName()))
-    model.getPdf('JJ_%s'%quantile).plotOn(frame,ROOT.RooFit.LineColor(ROOT.kRed+1),ROOT.RooFit.Name("model_s"))
+    model.getPdf('JJ_%s'%label).plotOn(frame,ROOT.RooFit.VisualizeError(fres,1),ROOT.RooFit.FillColor(ROOT.kRed-7),ROOT.RooFit.LineColor(ROOT.kRed-7),ROOT.RooFit.Name(fres.GetName()))
+    model.getPdf('JJ_%s'%label).plotOn(frame,ROOT.RooFit.LineColor(ROOT.kRed+1),ROOT.RooFit.Name("model_s"))
+    #model_qcd.plotOn(frame,ROOT.RooFit.VisualizeError(fres,1),ROOT.RooFit.FillColor(ROOT.kGreen-7),ROOT.RooFit.LineColor(ROOT.kGreen-7), ROOT.RooFit.Name("Background"))
+    #model_qcd.plotOn(frame,ROOT.RooFit.LineColor(ROOT.kRed+1),ROOT.RooFit.Name("Background"))
+    #sig_norm_pdf.plotOn(frame,ROOT.RooFit.VisualizeError(fres,1),ROOT.RooFit.FillColor(ROOT.kBlue-7),ROOT.RooFit.LineColor(ROOT.kBlue-7), ROOT.RooFit.Name("Signal"))
+    #sig_norm_pdf.plotOn(frame,ROOT.RooFit.LineColor(ROOT.kBlue+1), ROOT.RooFit.Name("Signal"))
 
     frame3 = var.frame()
     #average bin edges instead of bin center
@@ -269,7 +354,11 @@ def checkSBFit(filename,quantile,roobins,plotname, nPars, plot_dir):
     
     data.plotOn(frame,ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson), ROOT.RooFit.Binning(roobins),ROOT.RooFit.Name("data_obs"),ROOT.RooFit.XErrorSize(0))
     chi2,ndof = calculateChi2(hpull, nPars)
-    PlotFitResults(frame,fres.GetName(),nPars,frame3,"data_obs","model_s",chi2,ndof,'sbFit_'+plotname, plot_dir)
+
+    pdf_names = ["model_s"] 
+    PlotFitResults(frame,fres.GetName(),nPars,frame3,"data_obs", pdf_names,chi2,ndof,'sbFit_'+plotname, plot_dir, has_sig = True)
+
+    print "chi2,ndof are", chi2, ndof
 
 
 def f_test(nParams, nDof, chi2, thresh = 0.05):

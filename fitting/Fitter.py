@@ -2,14 +2,17 @@ import ROOT
 import json
 from numpy import random
 from array import array
-import sys,commands
+import os,sys,commands
 ROOT.RooMsgService.instance().setGlobalKillBelow(ROOT.RooFit.ERROR)
 
 class Fitter(object):
     def __init__(self,poi = ['x'], debug = False):
-        self.cache=ROOT.TFile("cache%i.root"%(random.randint(0, 1e+6)),"RECREATE")
+        self.cache_name = "cache%i.root"%(random.randint(0, 1e+6))
+        print("Making cache %s "  % self.cache_name)
+        self.cache=ROOT.TFile(self.cache_name,"RECREATE")
         self.cache.cd()
         self.debug = debug
+        self.cleanedup = False
 
         self.w=ROOT.RooWorkspace("w","w")
         self.dimensions = len(poi)
@@ -17,11 +20,17 @@ class Fitter(object):
         for v in poi:
             self.w.factory(v+"[1,161]")
 
+
+    def __del__(self):
+        if(not self.cleanedup): self.delete()
+
     def delete(self):
         if self.w:
             self.w.Delete()
         self.cache.Close()
         self.cache.Delete()
+        os.system("rm %s" % self.cache_name)
+        self.cleanedup = True
 
     def importBinnedData(self,histogram,poi = ["x"],name = "data", regions=[]):
         cList = ROOT.RooArgList()
@@ -78,16 +87,18 @@ class Fitter(object):
         return self.w
 
     def fit(self,model = "model",data="data",options=[]):
+        fit_data = self.w.data(data)
+
         if len(options)==0:
-            fitresults = self.w.pdf(model).fitTo(self.w.data(data))
+            fitresults = self.w.pdf(model).fitTo(fit_data)
         if len(options)==1:
-            fitresults = self.w.pdf(model).fitTo(self.w.data(data),options[0])	    
+            fitresults = self.w.pdf(model).fitTo(fit_data,options[0])	    
         if len(options)==2:
-            fitresults = self.w.pdf(model).fitTo(self.w.data(data),options[0],options[1])
+            fitresults = self.w.pdf(model).fitTo(fit_data,options[0],options[1])
         if len(options)==3:
-            fitresults = self.w.pdf(model).fitTo(self.w.data(data),options[0],options[1],options[2])
+            fitresults = self.w.pdf(model).fitTo(fit_data,options[0],options[1],options[2])
         if len(options)==4:
-            fitresults = self.w.pdf(model).fitTo(self.w.data(data),options[0],options[1],options[2],options[3])
+            fitresults = self.w.pdf(model).fitTo(fit_data,options[0],options[1],options[2],options[3])
 
         if fitresults:
             fitresults.Print() 
