@@ -37,9 +37,9 @@ class Outputer:
         self.idx = 0
         self.jet1_PFCands = np.zeros((self.batch_size, self.n_pf_cands,4), dtype=np.float16)
         self.jet2_PFCands = np.zeros((self.batch_size, self.n_pf_cands, 4), dtype=np.float16)
-        self.jet1_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
-        self.jet2_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
-        self.jet_kinematics = np.zeros((self.batch_size, 14), dtype=np.float32)
+        self.jet1_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float16)
+        self.jet2_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float16)
+        self.jet_kinematics = np.zeros((self.batch_size, 14), dtype=np.float16)
         self.event_info = np.zeros((self.batch_size, 5), dtype=np.float32)
 
 
@@ -55,7 +55,9 @@ class Outputer:
 
         for p in range(nGenParts):
             m = GenParts_mother[p]
-            if abs(GenParts_pdgId[p]) > 11 and abs(GenParts_pdgId[p]) < 18 and m > 0 and GenParts_mass[abs(m)]>20: 
+            if(m < 0 or abs(m) > nGenParts):
+                continue
+            elif abs(GenParts_pdgId[p]) > 11 and abs(GenParts_pdgId[p]) < 18 and GenParts_mass[abs(m)]>20: 
                 return True
          
         return False
@@ -299,7 +301,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             #PhotonsCol = Collection(event, "Photon")
             subjets = Collection(event, "SubJet")
 
-            min_pt = 200
+            jet_min_pt = 200
             #keep 2 jets with pt > 200, tight id
             jet1 = jet2 = jet3 =  None
         
@@ -307,7 +309,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             for jet in AK8Jets:
                 #jetId : bit1 = loose, bit2 = tight, bit3 = tightLepVeto
                 #want tight id
-                if((jet.jetId & 2 == 2) and jet.pt > min_pt and abs(jet.eta) < 2.5):
+                if((jet.jetId & 2 == 2) and jet.pt > jet_min_pt and abs(jet.eta) < 2.5):
                     jet.PFConstituents_Start = pf_conts_start
                     if(jet1 == None or jet.pt > jet1.pt):
                         jet3 = jet2
