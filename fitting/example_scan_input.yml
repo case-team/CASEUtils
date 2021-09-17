@@ -1,0 +1,26 @@
+## mapping mass values to input files (to incorporate SR-dependent taggings)
+
+1800: test_mjj.h5 
+1900: test_mjj.h5
+2000: test_mjj.h5
+2100: test_mjj.h5
+2200: test_mjj.h5
+2300: test_mjj.h5
+2400: test_mjj.h5
+2500: test_mjj.h5
+2600: test_mjj.h5
+2700: test_mjj.h5
+2800: test_mjj.h5
+2900: test_mjj.h5
+3000: test_mjj.h5
+3100: test_mjj.h5  
+3200: test_mjj.h5 
+3300: test_mjj.h5 
+3400: test_mjj.h5 
+3500: test_mjj.h5 
+3600: test_mjj.h5 
+3700: test_mjj.h5 
+3800: test_mjj.h5
+3900: test_mjj.h5 
+4000: test_mjj.h5 
+

@@ -113,12 +113,22 @@ def dijetfit(options):
     fit_ranges = [(binsx[0], sb1_edge), (sb2_edge, binsx[-1])]
 
 
-
     histos_sb_blind = apply_blinding(histos_sb, ranges = fit_ranges)
     num_blind = histos_sb_blind.Integral()
-    norm = ROOT.RooFit.Normalization(num_blind, ROOT.RooAbsReal.NumEvent)
 
+    if options.blinded:
+        fitting_histogram = histos_sb_blind
+        data_name = "data_qcd_blind"
+        fit_range = blind_range
+        chi2_range = fit_ranges
+        norm = ROOT.RooFit.Normalization(num_blind, ROOT.RooAbsReal.NumEvent)
 
+    else:
+        fitting_histogram = histos_sb
+        data_name = "data_qcd"
+        fit_range = full_range
+        chi2_range = None
+        norm = ROOT.RooFit.Normalization(histos_sb.Integral(), ROOT.RooAbsReal.NumEvent)
 
 
     for i,nPars in enumerate(nParsToTry):
@@ -131,14 +141,14 @@ def dijetfit(options):
          
         fitter_QCD=Fitter(['mjj_fine'])
         fitter_QCD.qcdShape(model_name,'mjj_fine',nPars)
-        fitter_QCD.importBinnedData(histos_sb_blind,['mjj_fine'],'data_qcd_blind', regions = regions)
+        fitter_QCD.importBinnedData(fitting_histogram,['mjj_fine'],data_name, regions = regions)
 
         #For some reason (???) the first fit gives some weird results, but if you fit it twice it works ok??? This should be fixed...
-        fres = fitter_QCD.fit(model_name,'data_qcd_blind', options = [ROOT.RooFit.Save(1), ROOT.RooFit.Verbose(0), blind_range])
-        fres = fitter_QCD.fit(model_name,'data_qcd_blind', options = [ROOT.RooFit.Save(1), ROOT.RooFit.Verbose(0), blind_range])
+        fres = fitter_QCD.fit(model_name,data_name, options = [ROOT.RooFit.Save(1), ROOT.RooFit.Verbose(0), fit_range])
+        fres = fitter_QCD.fit(model_name,data_name, options = [ROOT.RooFit.Save(1), ROOT.RooFit.Verbose(0), fit_range])
         
-        chi2_fine = fitter_QCD.projection(model_name,"data_qcd_blind","mjj_fine",plot_dir + str(nPars) + "par_qcd_fit.png",0,True)
-        #chi2_binned = fitter_QCD.projection(model_name,"data_qcd","mjj_fine",plot_dir + str(nPars) + "par_qcd_fit_binned.png",roobins,True)
+        chi2_fine = fitter_QCD.projection(model_name,data_name,"mjj_fine",plot_dir + str(nPars) + "par_qcd_fit.png",0,True)
+        #chi2_binned = fitter_QCD.projection(model_name,data_name,"mjj_fine",plot_dir + str(nPars) + "par_qcd_fit_binned.png",roobins,True)
         
         qcd_outfile.cd()
         histos_sb_blind.Write()
@@ -146,14 +156,14 @@ def dijetfit(options):
         mjj = fitter_QCD.getVar('mjj_fine')
         mjj.setBins(bins_fine)
         model = fitter_QCD.getFunc(model_name)
-        dataset = fitter_QCD.getData('data_qcd_blind')
+        dataset = fitter_QCD.getData(data_name)
         
         frame = mjj.frame()
-        dataset.plotOn(frame,ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson), ROOT.RooFit.Name("data_qcd_blind"),ROOT.RooFit.Invisible(),ROOT.RooFit.Binning(roobins))
+        dataset.plotOn(frame,ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson), ROOT.RooFit.Name(data_name),ROOT.RooFit.Invisible(),ROOT.RooFit.Binning(roobins))
         model.plotOn(frame,ROOT.RooFit.VisualizeError(fres,1),ROOT.RooFit.FillColor(ROOT.kRed-7),ROOT.RooFit.LineColor(ROOT.kRed-7),ROOT.RooFit.Name(fres.GetName()), 
-                ROOT.RooFit.Range("SB1,SB2"), norm)
+                fit_range.Clone(), norm)
         model.plotOn(frame,ROOT.RooFit.LineColor(ROOT.kRed+1),ROOT.RooFit.Name(model_name), 
-                ROOT.RooFit.Range("SB1,SB2"), norm)
+                fit_range.Clone(), norm)
         
 
         #Compute integrals over signal region
@@ -165,17 +175,17 @@ def dijetfit(options):
         #num_full = num_blind * (1 + sig_region_integral/full_integral)
         #full_norm = ROOT.RooFit.Normalization(histos_sb.Integral(), ROOT.RooAbsReal.NumEvent)
 
-        dataset.plotOn(frame,ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson),ROOT.RooFit.Name("data_qcd_blind"),ROOT.RooFit.XErrorSize(0),ROOT.RooFit.Binning(roobins))
+        dataset.plotOn(frame,ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson),ROOT.RooFit.Name(data_name),ROOT.RooFit.XErrorSize(0),ROOT.RooFit.Binning(roobins))
         model.plotOn(frame,ROOT.RooFit.Invisible(),ROOT.RooFit.Name(model_name), full_range, norm) #for correct pulls
         #average bin edges instead of bin center
         framePulls = mjj.frame()
         useBinAverage = True
-        hpull = frame.pullHist("data_qcd_blind",model_name,useBinAverage)
+        hpull = frame.pullHist(data_name,model_name,useBinAverage)
         framePulls.addPlotable(hpull,"X0 P E1")
         
-        my_chi2,my_ndof = calculateChi2(hpull,nPars, ranges = fit_ranges)
+        my_chi2,my_ndof = calculateChi2(hpull,nPars, ranges = chi2_range)
         my_prob = ROOT.TMath.Prob(my_chi2,my_ndof)
-        PlotFitResults(frame,fres.GetName(),nPars,framePulls,"data_qcd_blind",model_name,my_chi2,my_ndof, str(nPars) + "par_qcd_fit_binned_blinded", plot_dir)
+        PlotFitResults(frame,fres.GetName(),nPars,framePulls,data_name,model_name,my_chi2,my_ndof, str(nPars) + "par_qcd_fit_binned{}".format("_blinded" if options.blinded else ""), plot_dir)
         
         graphs = {}
         for p in range(nPars): graphs['p%i'%(p+1)] = ROOT.TGraphErrors()
@@ -318,6 +328,7 @@ def fitting_options():
     parser.add_option("-i","--inputFile",dest="inputFile",default='fit_inputs/no_selection_03p.h5',help="input h5 file")
     parser.add_option("-p","--plotDir",dest="plotDir",default='plots/',help="Where to put the plots")
     parser.add_option("-l","--label",dest="label",default='test',help="Label for file names")
+    parser.add_option("-b", "--blinded", dest="blinded", action="store_true", default=False, help="Blinding the signal region for the fit.")
     return parser
 
 if __name__ == "__main__":
