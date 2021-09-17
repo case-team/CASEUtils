@@ -44,7 +44,7 @@ class Fitter(object):
             elif i==2:
                 axis=histogram.GetZaxis()
             else:
-                print 'Asking for more than 3 D . ROOT doesnt support that, use unbinned data instead'
+                print ('Asking for more than 3 D . ROOT doesnt support that, use unbinned data instead')
                 return
             mini=axis.GetXmin()
             maxi=axis.GetXmax()
@@ -60,7 +60,7 @@ class Fitter(object):
                 for reg_name,reg_low,reg_high in regions:
                     var.setRange(reg_name, reg_low, reg_high)
             if(self.debug): 
-                print " set binning "+str(binningx)
+                print (" set binning "+str(binningx)) 
             var.setBinning(ROOT.RooBinning(len(binningx)-1,array("d",binningx)))
             #a = self.w.var(p).getBinning()
             #for b in range(0,a.numBins()+1):
@@ -70,8 +70,8 @@ class Fitter(object):
 
     def fetch(self,var):
         self.w.var(var).Print()
-        print "Fetching value " ,self.w.var(var).getVal()  
-        print "Fetching error " ,self.w.var(var).getError()
+        print("Fetching value " ,self.w.var(var).getVal()  )
+        print("Fetching error " ,self.w.var(var).getError())
         return (self.w.var(var).getVal(), self.w.var(var).getError())
 
     def getFunc(self,model = "model"):
@@ -129,7 +129,7 @@ class Fitter(object):
             fr = f.Get('fitresults')
         else:
             fr = 0
-            print "No fit result found (fitresults.root), plotting model only"
+            print("No fit result found (fitresults.root), plotting model only")
 
         if binning:
             self.w.data(data).plotOn(self.frame,ROOT.RooFit.Binning(binning),ROOT.RooFit.Invisible())

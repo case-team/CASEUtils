@@ -1,4 +1,6 @@
-from H5_maker import *
+from __future__ import absolute_import
+import utils
+import h5py
 import os
 import sys
 
@@ -27,7 +29,7 @@ def merge(fin_name, fout_name):
         fout['preselection_eff'][0] = (n_fin * fin['preselection_eff'][0] + n_fout * fout['preselection_eff'][0]) / (n_fin + n_fout)
 
     for key in fin_keys:
-        append_h5(fout, key, fin[key])
+        utils.append_h5(fout, key, fin[key])
 
 
 def my_copy(fin_name, fout_name):
