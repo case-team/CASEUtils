@@ -1,5 +1,4 @@
 from Fitter import Fitter
-from DataCardMaker_counting import DataCardMaker
 from Utils import *
 import ROOT
 import h5py
