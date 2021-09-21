@@ -1,6 +1,8 @@
+import sys
 from Fitter import Fitter
 from DataCardMaker import DataCardMaker
 from Utils import *
+import pickle
     
         
 
@@ -35,11 +37,10 @@ def dijetfit(options):
 
 
 
-    print "************ Found",histos_sb.GetEntries(),"total events"
-    print
+    print("************ Found %i total events \n" % histos_sb.GetEntries())
 
     if(options.refit_sig):
-        print "########## FIT SIGNAL AND SAVE PARAMETERS ############"
+        print ("########## FIT SIGNAL AND SAVE PARAMETERS ############")
         sig_file_name = "sig_fit.root"
 
 
@@ -80,10 +81,12 @@ def dijetfit(options):
          
         sig_outfile.Close() 
         
-        print "#############################"
-        print "signal fit chi2 (fine binning)",chi2_fine
-        print "signal fit chi2 (large binning)",chi2
-        print "#############################"
+        print (
+        """"#############################
+            signal fit chi2 (fine binning), %.3f 
+            signal fit chi2 (large binning), %.3f
+            ############################# """ %(chi2_fine, chi2)
+        )
 
     else: #use precomputed signal shape
         sig_file_name = options.sig_shape
@@ -94,9 +97,7 @@ def dijetfit(options):
 
 
 
-    print
-    print
-    print "############# FIT BACKGROUND AND SAVE PARAMETERS ###########"
+    print ("\n\n ############# FIT BACKGROUND AND SAVE PARAMETERS ###########")
     chi2s = [0]*len(nParsToTry)
     ndofs = [0]*len(nParsToTry)
     probs = [0]*len(nParsToTry)
@@ -189,7 +190,7 @@ def dijetfit(options):
         graphs = {}
         for p in range(nPars): graphs['p%i'%(p+1)] = ROOT.TGraphErrors()
         for var,graph in graphs.iteritems():
-            print var
+            print(var)
             value,error=fitter_QCD.fetch(var)
             graph.SetPoint(0,mass,value)
             graph.SetPointError(0,0.0,error)
@@ -199,12 +200,12 @@ def dijetfit(options):
             
         qcd_outfile.Close()
 
-        print "#############################"
-        print "% i Parameter results: " % nPars 
-        print "bkg fit chi2/nbins (fine binning)",chi2_fine
-        print "My chi2, ndof, prob", my_chi2, my_ndof, my_prob
-        print "My chi/ndof, chi2/nbins", my_chi2/my_ndof, my_chi2/(my_ndof + nPars)
-        print "#############################"
+        print("#############################")
+        print("% i Parameter results: " % nPars )
+        print("bkg fit chi2/nbins (fine binning) ",chi2_fine)
+        print("My chi2, ndof, prob", my_chi2, my_ndof, my_prob)
+        print("My chi/ndof, chi2/nbins", my_chi2/my_ndof, my_chi2/(my_ndof + nPars))
+        print("#############################")
 
         chi2s[i] = my_chi2
         ndofs[i] = my_ndof
@@ -225,7 +226,7 @@ def dijetfit(options):
     #histos_sb.Print("range")
     #histos_qcd.Print("range")
     #histos_sig.Print("range")
-    print "************ Found",histos_sb.GetEntries(),"total events"
+    print("************ Found",histos_sb.GetEntries(),"total events")
 
 
     sb_fname = "sb_fit.root"
@@ -266,7 +267,7 @@ def dijetfit(options):
           #" && combine -M Significance workspace_JJ_{l1}_{l2}.root -m {mass} --pvalue -n pvalue_{l1}_{l2}"  + 
           " && combine -M AsymptoticLimits workspace_JJ_{l1}_{l2}.root -m {mass} -n lim_{l1}_{l2}"
           ).format(mass=mass,l1=label,l2=sb_label)
-    print cmd
+    print(cmd)
     os.system(cmd)
     checkSBFit('workspace_JJ_{l1}_{l2}.root'.format(l1=label,l2=sb_label),sb_label,roobins,label + "_" + sb_label, nPars_QCD, plot_dir)
 
@@ -283,6 +284,8 @@ def dijetfit(options):
     f_limit = ROOT.TFile(f_limit_name, "READ")
     res2 = f_limit.Get("limit")
     eps = 0.01
+    obs_limit = -1
+    exp_limit = -1
     for i in range(6):
         res2.GetEntry(i)
         if(res2.quantileExpected == -1): #obs limit
@@ -291,11 +294,13 @@ def dijetfit(options):
             exp_limit = res2.limit
 
     print("Obs limit is %.3f (%.1f events), Expected was %.3f (%.1f events)" % (obs_limit, obs_limit * sig_norm, exp_limit, exp_limit * sig_norm))
+    check_rough_sig(options.inputFile, options.mass * 0.9, options.mass * 1.1)
     
     f_signif.Close()
     f_limit.Close()
 
     results = dict()
+
 
     #QCD fit results
     results['chi2']  = chi2s[best_i]
@@ -306,6 +311,10 @@ def dijetfit(options):
     results['signif'] = signif
     results['obs_lim_events'] = obs_limit*sig_norm
     results['exp_lim_events'] = exp_limit*sig_norm
+
+    print("Saving fit results to %s" % plot_dir + "fit_results.pkl")
+    with open(plot_dir + "fit_results.pkl", "w") as f:
+        pickle.dump(results, f)
 
     return results
         

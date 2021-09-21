@@ -5,6 +5,8 @@ from ROOT import TLorentzVector, TFile
 import numpy as np
 import h5py
 from optparse import OptionParser
+import utils
+
 
 from PhysicsTools.NanoAODTools.postprocessing.framework.datamodel import *
 from PhysicsTools.NanoAODTools.postprocessing.framework.postprocessor import PostProcessor
@@ -16,10 +18,6 @@ from PhysicsTools.NanoAODTools.postprocessing.framework.preskimming import preSk
 
 
 
-def append_h5(f, name, data):
-    prev_size = f[name].shape[0]
-    f[name].resize(( prev_size + data.shape[0]), axis=0)
-    f[name][prev_size:] = data
 
 
 class Outputer:
@@ -151,13 +149,13 @@ class Outputer:
 
         else:
             with h5py.File(self.output_name, "a") as f:
-                append_h5(f,'truth_label',truth_label_write)
-                append_h5(f,'event_info',self.event_info)
-                append_h5(f,'jet_kinematics',self.jet_kinematics)
-                append_h5(f,'jet1_extraInfo',self.jet1_extraInfo)
-                append_h5(f,'jet2_extraInfo',self.jet2_extraInfo)
-                append_h5(f,'jet1_PFCands',self.jet1_PFCands)
-                append_h5(f,'jet2_PFCands',self.jet2_PFCands)
+                utils.append_h5(f,'truth_label',truth_label_write)
+                utils.append_h5(f,'event_info',self.event_info)
+                utils.append_h5(f,'jet_kinematics',self.jet_kinematics)
+                utils.append_h5(f,'jet1_extraInfo',self.jet1_extraInfo)
+                utils.append_h5(f,'jet2_extraInfo',self.jet2_extraInfo)
+                utils.append_h5(f,'jet1_PFCands',self.jet1_PFCands)
+                utils.append_h5(f,'jet2_PFCands',self.jet2_PFCands)
 
         self.reset()
 
