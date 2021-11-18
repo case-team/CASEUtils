@@ -88,8 +88,6 @@ class Outputer:
             
     
     def fill_event(self, inTree, jet1, jet2, jet3, PFCands, subjets, mjj):
-        
-        import pdb; pdb.set_trace()
 
         if self.sample_type == "data":
             genWeight = 1
