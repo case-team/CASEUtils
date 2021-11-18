@@ -3,6 +3,8 @@ import utils
 import h5py
 import os
 import sys
+from os import listdir
+from os.path import isfile, join
 
 # merge multiple h5's together (like hadd)
 # syntax is python H5_merge.py output_name.h5 input1.h5 input2.h5 input3.h5 ...
@@ -59,6 +61,12 @@ def merge_multiple(fout_name, fs):
 #merge_multiple("test.h5", ["output_files/QCD_HT1000to1500_0.h5", "output_files/QCD_HT1000to1500_1.h5", "output_files/QCD_HT1000to1500_2.h5"])
 if __name__ == "__main__":
     #print(sys.argv[1], sys.argv[2:])
-    merge_multiple(sys.argv[1], sys.argv[2:])
-
+    
+    pt_bin = sys.argv[3]
+    input_dir = sys.argv[2]
+    
+    onlyfiles = [join(input_dir, f) for f in listdir(input_dir) if (isfile(join(input_dir, f)) & (pt_bin in f))]
+    merge_multiple(sys.argv[1], onlyfiles)
+    
+    print("Done!")
 

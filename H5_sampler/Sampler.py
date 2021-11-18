@@ -5,7 +5,10 @@ class Sampler():
     def __init__(self, filename, xsec, lumi, holdout_frac = 0., isSignal = False):
         self.filename = filename
         with h5py.File(self.filename, "r") as h5_file:
-            self.eff_xsec = xsec * h5_file['preselection_eff'][0]
+            if isSignal:
+                self.eff_xsec = 1.0
+            else:
+                self.eff_xsec = xsec * h5_file['preselection_eff'][0]
             self.keys = h5_file.keys()
             self.nEvents = h5_file['event_info'].shape[0]
         self.nSample = int(lumi * self.eff_xsec)
@@ -74,7 +77,8 @@ class BlackBox():
         if(len(keys) == 0):
             #empty list means keep everything
             self.keys = (self.samplers[0]).keys
-            self.keys.remove('preselection_eff')
+            if "preselection_eff" in self.keys:
+                self.keys.remove('preselection_eff')
         else:
             self.keys = keys
 
@@ -109,12 +113,14 @@ class BlackBox():
             #Fill the data from the various samplers
             for key in self.keys:
                 print("Getting data for key %s " % key)
+                
                 for j,sam in enumerate(self.samplers):
                     if(j==0): 
                         self.data[key] = sam.sample(key)
 
-                    else: 
+                    else:
                         self.data[key] = np.append(self.data[key], sam.sample(key), axis = 0)
+
 
                 #Shuffle the order
                 self.data[key] = self.data[key][shuffle_order]
