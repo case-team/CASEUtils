@@ -33,7 +33,7 @@ def nPFCounter(index, event):
 
 
 class Outputer:
-    def __init__(self, outputFileName="out.root", batch_size = 5000, truth_label = 0, sample_type="MC", include_systematics = False):
+    def __init__(self, outputFileName="out.root", batch_size = 5000, truth_label = 0, sample_type="MC", sort_pfcands = False, include_systematics = False):
         self.batch_size = batch_size
         self.output_name = outputFileName
         self.sample_type = sample_type
@@ -43,6 +43,7 @@ class Outputer:
         self.nBatch = 0
         self.n_pf_cands = 100 #how many PF candidates to save (max)
         self.include_systematics = include_systematics
+        self.sort_pfcands = sort_pfcands
         self.reset()
 
     def reset(self):
@@ -75,7 +76,16 @@ class Outputer:
         return False
         return 0
 
-
+    def get_pfcands_sorted(self, pfcands):
+        
+        
+        pfcands_pt = np.sqrt(pfcands[:, 0]**2 + pfcands[:, 1]**2)
+        sorted_idx = np.flip(np.argsort(pfcands_pt))
+        pfcands = pfcands[sorted_idx]
+        
+        return pfcands.astype(np.float16)
+            
+    
     def fill_event(self, inTree, jet1, jet2, jet3, PFCands, subjets, mjj):
 
         if self.sample_type == "data":
@@ -139,8 +149,14 @@ class Outputer:
         self.jet_kinematics[self.idx] = np.array(jet_kinematics, dtype = np.float32)
         self.jet1_extraInfo[self.idx] = np.array(jet1_extraInfo, dtype = np.float32)
         self.jet2_extraInfo[self.idx] = np.array(jet2_extraInfo, dtype = np.float32)
-        self.jet1_PFCands[self.idx,:jet1.nPFConstituents] = np.array(jet1_PFCands, dtype = np.float16)
-        self.jet2_PFCands[self.idx,:jet2.nPFConstituents] = np.array(jet2_PFCands, dtype = np.float16)
+        
+        # sort PFCands by pt
+        if self.sort_pfcands:
+            self.jet1_PFCands[self.idx,:jet1.nPFConstituents] = self.get_pfcands_sorted(np.array(jet1_PFCands, dtype = np.float32))
+            self.jet2_PFCands[self.idx,:jet2.nPFConstituents] = self.get_pfcands_sorted(np.array(jet2_PFCands, dtype = np.float32))
+        else:
+            self.jet1_PFCands[self.idx,:jet1.nPFConstituents] = np.array(jet1_PFCands, dtype = np.float16)
+            self.jet2_PFCands[self.idx,:jet2.nPFConstituents] = np.array(jet2_PFCands, dtype = np.float16)
 
         self.idx +=1
         if(self.idx % self.batch_size == 0): self.write_out()
@@ -264,7 +280,7 @@ class SysHelper():
 
 
 
-def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.root", json = '', year = 2016, nEventsMax = -1, sampleType = "MC"):
+def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.root", json = '', year = 2016, nEventsMax = -1, sampleType = "MC", sort_pfcands=False):
     
     if not ((sampleType == "MC") or (sampleType=="data")):
         print("Error! sampleType needs to be set to either data or MC! Please set correct option and retry.")
@@ -280,14 +296,17 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
     "Flag_EcalDeadCellTriggerPrimitiveFilter",
     "Flag_BadChargedCandidateFilter",
     ]
-    if(year == 2016): filters.append("Flag_CSCTightHaloFilter")
+    if((year == 2016) or (year == 2016.5)): filters.append("Flag_CSCTightHaloFilter")
 
     if(year == 2016):
-        triggers = ["HLT_PFHT800", "HLT_PFHT900", "HLT_PFJet450", "HLT_PFJet500", "HLT_AK8PFJet450", "HLT_AK8PFJet500"]
+        triggers = ["HLT_PFHT800", "HLT_PFJet450"]
+    #2016.5 corresponds to run 2016H, which needs specific triggers
+    elif (year == 2016.5):
+        triggers = ["HLT_PFHT900", "HLT_PFJet450", "HLT_AK8PFJet450"]
     elif(year == 2017):
-        triggers = ["HLT_PFHT1050", "HLT_PFJet500", "HLT_AK8PFJet380_TrimMass30", 'HLT_AK8PFJet400_TrimMass30']
+        triggers = ["HLT_PFHT1050", "HLT_AK8PFJet500"]
     elif(year == 2018):
-        triggers = ["HLT_PFHT1050", "HLT_PFJet500", "HLT_AK8PFJet380_TrimMass30", 'HLT_AK8PFJet400_TrimMass30']
+        triggers = ["HLT_PFHT1050", "HLT_AK8PFJet500"]
     else:
         print("Invalid year option of %i. Year must be 2016, 2017, or 2018! \n" % year)
         exit(1)
@@ -297,14 +316,8 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
                 'HLT_PFHT890',
                 'HLT_PFHT1050',
                 'HLT_PFJet500',
-                'HLT_AK8PFJet500',
-                'HLT_AK8PFHT700_TrimMass50',
-                'HLT_AK8PFHT800_TrimMass50',
-                'HLT_AK8PFHT900_TrimMass50',
-                'HLT_AK8PFJet360_TrimMass30',
-                'HLT_AK8PFJet380_TrimMass30',
-                'HLT_AK8PFJet400_TrimMass30',
-                'HLT_AK8PFJet420_TrimMass30',
+                'HLT_AK8PFJet450',
+                'HLT_AK8PFJet500'
                 ]
 
     mjj_cut = 1200.
@@ -347,7 +360,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             inTree= InputTree(inTree) 
             print('Running over %i entries \n' % nTotal)
 
-        out = Outputer(outputFileName, truth_label =  process_flag, sample_type=sampleType)
+        out = Outputer(outputFileName, truth_label =  process_flag, sample_type=sampleType, sort_pfcands=sort_pfcands)
 
 
         # Grab event tree from nanoAOD
@@ -376,10 +389,14 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             passFilter = True
             for fil in filters:
                 passFilter = passFilter and inTree.readBranch(fil)
-            for trig in triggers:
-                passTrigger = passTrigger or inTree.readBranch(trig)
             if(not passFilter): continue
-            if(not passTrigger): continue
+            
+            # Apply triggers only to data, not MC!
+            if sampleType == "data":
+                for trig in triggers:
+                    passTrigger = passTrigger or inTree.readBranch(trig)
+
+                if(not passTrigger): continue
 
 
 
@@ -400,6 +417,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             #PhotonsCol = Collection(event, "Photon")
             subjets = Collection(event, "SubJet")
 
+<<<<<<< HEAD
             if(include_systematics):
 
                 pdf_weights = Collection(event, "LHEPdfWeight")
@@ -438,8 +456,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
                 
 
 
-
-            jet_min_pt = 200
+            jet_min_pt = 300
             #keep 2 jets with pt > 200, tight id
             jet1 = jet2 = jet3 =  None
         
