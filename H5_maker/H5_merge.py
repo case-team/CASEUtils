@@ -65,4 +65,6 @@ if __name__ == "__main__":
     
     onlyfiles = [join(input_dir, f) for f in listdir(input_dir) if (isfile(join(input_dir, f)) & (pt_bin in f))]
     merge_multiple(sys.argv[1], onlyfiles)
+    
+    print("Done!")
 
