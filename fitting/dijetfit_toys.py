@@ -19,23 +19,26 @@ from Utils import *
 if __name__ == "__main__":
     parser = optparse.OptionParser()
     # 0.0003
-    parser.add_option("--xsec","--xsec",dest="xsec",type=float,default=1,help="Injected signal cross section (suggested range 0-0.03)")
+    parser.add_option("--xsec","--xsec",dest="xsec",type=float,default=1,help="Ratio of signal yield generated in toys to signal yield in sample (default = 1 = same yield)")
     parser.add_option("-M","-M",dest="mass",type=float,default=2500.,help="Injected signal mass")
     parser.add_option("-i","--inputFile",dest="inputFile",default='fit_inputs/no_selection_03p.h5',help="input h5 file")
     parser.add_option("-p","--plotDir",dest="plotDir",default='plots/',help="Where to put the plots")
-    parser.add_option("--nToys", type=int, default =5, help='how many toys to generate')
+    parser.add_option("-s","--correctStats",default=False, action='store_true',help="Take into account repeated events in the input so statistical uncs. are correct")
+    parser.add_option("--nToys", type=int, default =10, help='how many toys to generate')
     (options,args) = parser.parse_args()
 
     label = 'test'
 
     plot_dir = options.plotDir
+    if(plot_dir[-1] != '/'): plot_dir+= '/'
     os.system("mkdir %s" % plot_dir)
 
-    fine_bin_size = 4
+    fine_bin_size = 16
      
     xsec = options.xsec
     mass = options.mass 
-    nParsToTry = [2,3,4]
+    #nParsToTry = [2,3,4]
+    nParsToTry = [2,4]
 
     binsx = [1530,1607,1687,1770,1856,1945,2037,2132,2231,2332,2438,2546,2659,2775,2895,3019,3147,3279,3416,3558,3704,3854,4010,4171,4337,4509,4686,4869,5058,5253,5500,5663,5877,6099,6328,6564,6808]
     #round to smallest precision we are storing mass values with, otherwise get weird effects related to bin size
@@ -56,7 +59,7 @@ if __name__ == "__main__":
 
     #Signal data preparation 
     histos_sig = ROOT.TH1F("mjj_sig","mjj_sig",len(bins_sig_fit)-1,bins_sig_fit)
-    load_h5_sig(options.inputFile,histos_sig, mass)
+    load_h5_sig(options.inputFile,histos_sig, mass, options.correctStats)
     print "************ Found",histos_sig.GetEntries(),"signal events"
     print
 
@@ -97,11 +100,12 @@ if __name__ == "__main__":
     print "signal fit chi2 (large binning)",chi2
     print "#############################"
 
+
     #Fit to background events only (Can we make this optional?)
 
     #Background data preparation
     histos_qcd = ROOT.TH1F("mjj_qcd","mjj_qcd",bins_fine,binsx[0],binsx[-1])
-    load_h5_bkg(options.inputFile, histos_qcd)
+    load_h5_bkg(options.inputFile, histos_qcd, options.correctStats)
     print "************ Found",histos_qcd.GetEntries(),"background events"
     print
 
@@ -123,7 +127,7 @@ if __name__ == "__main__":
         fitter_QCD=Fitter(['mjj_fine'])
         fitter_QCD.qcdShape('model_b','mjj_fine',nPars)
         fitter_QCD.importBinnedData(histos_qcd,['mjj_fine'],'data_qcd')
-        fres = fitter_QCD.fit('model_b','data_qcd',[ROOT.RooFit.Save(1), ROOT.RooFit.Verbose(0)])
+        fres = fitter_QCD.fit('model_b','data_qcd',[ROOT.RooFit.Save(1), ROOT.RooFit.Verbose(0), ROOT.RooFit.SumW2Error(1)])
         #fres.Print()
         
         chi2_fine = fitter_QCD.projection("model_b","data_qcd","mjj_fine",plot_dir + str(nPars) + "par_qcd_fit.png",0,True)
@@ -138,7 +142,7 @@ if __name__ == "__main__":
         dataset = fitter_QCD.getData('data_qcd')
         
         frame = mjj.frame()
-        dataset.plotOn(frame,ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson), ROOT.RooFit.Name("data_qcd"),ROOT.RooFit.Invisible(),ROOT.RooFit.Binning(roobins))
+        dataset.plotOn(frame,ROOT.RooFit.DataError(ROOT.RooAbsData.SumW2), ROOT.RooFit.Name("data_qcd"),ROOT.RooFit.Invisible(),ROOT.RooFit.Binning(roobins))
         model.plotOn(frame,ROOT.RooFit.VisualizeError(fres,1),ROOT.RooFit.FillColor(ROOT.kRed-7),ROOT.RooFit.LineColor(ROOT.kRed-7),ROOT.RooFit.Name(fres.GetName()))
         model.plotOn(frame,ROOT.RooFit.LineColor(ROOT.kRed+1),ROOT.RooFit.Name("model_b"))
         
@@ -148,10 +152,10 @@ if __name__ == "__main__":
         hpull = frame.pullHist("data_qcd","model_b",useBinAverage)
         framePulls.addPlotable(hpull,"X0 P E1")
         
-        dataset.plotOn(frame,ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson),ROOT.RooFit.Name("data_qcd"),ROOT.RooFit.XErrorSize(0),ROOT.RooFit.Binning(roobins))
+        dataset.plotOn(frame,ROOT.RooFit.DataError(ROOT.RooAbsData.SumW2),ROOT.RooFit.Name("data_qcd"),ROOT.RooFit.XErrorSize(0),ROOT.RooFit.Binning(roobins))
         my_chi2,my_ndof = calculateChi2(hpull, nPars)
         my_prob = ROOT.TMath.Prob(my_chi2,my_ndof)
-        PlotFitResults(frame,fres.GetName(),nPars,framePulls,"data_qcd","model_b",my_chi2,my_ndof, str(nPars) + "par_qcd_fit_binned" , plot_dir)
+        PlotFitResults(frame,fres.GetName(),nPars,framePulls,"data_qcd",["model_b"],my_chi2,my_ndof, str(nPars) + "par_qcd_fit_binned" , plot_dir)
         
         graphs = {}
         for p in range(nPars): graphs['p%i'%(p+1)] = ROOT.TGraphErrors()
@@ -188,23 +192,67 @@ if __name__ == "__main__":
 
 
     #Fit to total data
-    #if(options.no_toys):
-    #    histos_sb = ROOT.TH1F("mjj_sb","mjj_sb",bins_fine,binsx[0],binsx[-1])
-    #    load_h5_sb(options.inputFile, histos_sb)
-    #    print "************ Found",histos_sb.GetEntries(),"total events"
+    histos_sb = ROOT.TH1F("mjj_sb","mjj_sb",bins_fine,binsx[0],binsx[-1])
+    load_h5_sb(options.inputFile, histos_sb, options.correctStats)
+    #histos_sb.Print("range")
+    #histos_qcd.Print("range")
+    #histos_sig.Print("range")
+    print "************ Found",histos_sb.GetEntries(),"total events"
 
 
-    #    sb_outfile = ROOT.TFile('sb_fit.root','RECREATE')
-    #    sb_outfile.cd()
-    #    histos_sb.Write("mjj_sb")
-    #    sb_outfile.Close()
+    sb_outfile = ROOT.TFile('sb_fit.root','RECREATE')
+    sb_outfile.cd()
+    histos_sb.Write("mjj_sb")
+    sb_outfile.Close()
 
-    #    sig_data_name = 'mjj_sb'
-    #else:
+    sig_data_name = 'mjj_sb'
+
+
+    sb_label = "raw"
+
+
+
+    card=DataCardMaker(sb_label)
+    
+    card.addSignalShape('model_signal_mjj','mjj','sig_fit.root',{'CMS_scale_j':1.0},{'CMS_res_j':1.0})
+    constant = xsec
+    card.addFixedYieldFromFile('model_signal_mjj',0,'sig_fit.root',"mjj_sig",constant=constant)
+    card.addSystematic("CMS_scale_j","param",[0.0,0.012])
+    card.addSystematic("CMS_res_j","param",[0.0,0.08]) 
+
+
+    
+    card.addQCDShapeNoTag('model_qcd_mjj','mjj',qcd_fname,nPars)
+    card.addFloatingYield('model_qcd_mjj',1,qcd_fname, histos_qcd.GetName())
+    for i in range(1,nPars+1): card.addSystematic("CMS_JJ_p%i"%i,"flatParam",[])
+    card.addSystematic("model_qcd_mjj_JJ_norm","flatParam",[])
+    
+    card.importBinnedData( "sb_fit.root", sig_data_name,["mjj"],'data_obs',1.0)
+    card.makeCard()
+    card.delete()
+    
+    cmd = 'text2workspace.py datacard_JJ_{l2}.txt -o workspace_JJ_{l1}_{l2}.root && combine -M Significance workspace_JJ_{l1}_{l2}.root -m {mass} -n significance_{l1}_{l2} && combine -M Significance workspace_JJ_{l1}_{l2}.root -m {mass} --pvalue -n pvalue_{l1}_{l2}'.format(mass=mass,l1=label,l2=sb_label)
+    print cmd
+    os.system(cmd)
+    checkSBFit('workspace_JJ_{l1}_{l2}.root'.format(l1=label,l2=sb_label),sb_label,roobins,label + "_" + sb_label, nPars, plot_dir)
+
+    f_signif_name = 'higgsCombinesignificance_{l1}_{l2}.Significance.mH{mass:.0f}.root'.format(mass = mass, l1=label, l2 = sb_label)
+    f_pval_name = 'higgsCombinepvalue_{l1}_{l2}.Significance.mH{mass:.0f}.root'.format(mass = mass, l1=label, l2 = sb_label)
+
+    f_signif = ROOT.TFile.Open(f_signif_name, "READ")
+    lim = f_signif.Get("limit")
+    lim.GetEntry(0)
+    raw_sig = lim.limit
+    f_signif.Close()
+    
+
+
+
 
     print
     print 
     print "############# GENERATE SIGNAL+BACKGROUND DATA FROM PDFs ###########"
+
 
     signifs = []
     for i in range(options.nToys):
@@ -297,7 +345,9 @@ if __name__ == "__main__":
         fitt.delete()
 
 
-    print "Toy significances were: " 
+    
+    print "Regular fit to events had significance", raw_sig
+    print "Toy significances were: "
     sig_sum = 0.
     for s in signifs:
         print s, " ", 
