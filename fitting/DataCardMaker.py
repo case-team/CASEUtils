@@ -8,19 +8,19 @@ ROOT.RooMsgService.instance().setGlobalKillBelow(ROOT.RooFit.WARNING)
 class DataCardMaker:
     def __init__(self,tag):
         self.systematics=[]
-	self.tag="JJ"+"_"+tag
+        self.tag="JJ"+"_"+tag
         self.rootFile = ROOT.TFile("datacardInputs_%s.root"%self.tag,"RECREATE")
         self.rootFile.cd()
         self.w=ROOT.RooWorkspace("w","w")
-	self.luminosity = 1.0
-	self.contributions=[]
-	self.systematics=[]
+        self.luminosity = 1.0
+        self.contributions=[]
+        self.systematics=[]
 
     def delete(self):
-     if self.w:
-      self.w.Delete()
-      self.rootFile.Close()
-      self.rootFile.Delete()
+        if self.w: 
+            self.w.Delete()
+            self.rootFile.Close()
+            self.rootFile.Delete()
       
     def makeCard(self):
 
@@ -100,8 +100,7 @@ class DataCardMaker:
                             break;
                     if not has:
                             f.write('-\t' )
-                f.write('\n' )
-                            
+                f.write('\n' )  
                         
         f.close()
 
@@ -109,7 +108,7 @@ class DataCardMaker:
         self.rootFile.cd()
         self.w.Write("w",0,2000000000)
         self.rootFile.Close()
-	
+    
     def importBinnedData(self,filename,histoname,poi,name = "data_obs",scale=1):
         f=ROOT.TFile(filename)
         histogram=f.Get(histoname)
@@ -133,21 +132,22 @@ class DataCardMaker:
             self.w.var(p).setMax(maxi)
             self.w.var(p).setBins(bins)
             self.w.var(p).setBins(bins,"cache")
-	    mjj=self.w.var(p)
+            mjj=self.w.var(p)
         dataHist=ROOT.RooDataHist(name,name,cList,histogram)
-	#dataHist=ROOT.RooDataHist(name, name, ROOT.RooArgList(mjj), ROOT.RooFit.Import(histogram)) 
+        #dataHist=ROOT.RooDataHist(name, name, ROOT.RooArgList(mjj), ROOT.RooFit.Import(histogram)) 
         getattr(self.w,'import')(dataHist,ROOT.RooFit.RenameVariable(name,name))
-	
+    
     def addSystematic(self,name,kind,values,bin="",process="",variables="",addPar = ""):
         if kind != 'rateParam': self.systematics.append({'name':name,'kind':kind,'values':values })
         else: self.systematics.append({'name':name,'kind':kind,'bin':bin,'process':process,'values':values,'variables':variables})
-	
+    
     def addFixedYieldFromFile(self,name,ID,filename,histoName,constant=1.0):
         pdfName="_".join([name,self.tag])
         f=ROOT.TFile(filename)
         histogram=f.Get(histoName)
         events=histogram.Integral()*self.luminosity*constant
         self.contributions.append({'name':name,'pdf':pdfName,'ID':ID,'yield':events})
+        return events
 
     def addFloatingYield(self,name,ID,filename,histoName,mini=0,maxi=1e+9,constant=False):
         pdfName="_".join([name,self.tag])
@@ -159,11 +159,12 @@ class DataCardMaker:
         if constant:
             self.w.var(pdfNorm).setConstant(1)
         self.contributions.append({'name':name,'pdf':pdfName,'ID':ID,'yield':1.0})
-		
+        return events
+        
     def addSignalShape(self,name,variable,jsonFile,scale ={},resolution={}):
     
         pdfName="_".join([name,self.tag])
-	
+    
         #self.w.factory("MH[3000]")
         #self.w.var("MH").setConstant(1)
        
@@ -182,109 +183,117 @@ class DataCardMaker:
             resolutionSysts.append(syst)
        
         self.w.factory(variable+"[0,13000]")
-	
-	f = ROOT.TFile(jsonFile,'READ')
-	meanG = f.Get('mean')
-	sigmaG = f.Get('sigma')
-	alphaG = f.Get('alpha')
-	scalesigmaG = f.Get('scalesigma')
-	sigfracG = f.Get('sigfrac')
-	signG = f.Get('sign')
-	
-	x = ROOT.Double(0.)
-	mean = ROOT.Double(0.)
-	meanG.GetPoint(0,x,mean)
-	sigma = ROOT.Double(0.)
-	sigmaG.GetPoint(0,x,sigma)	
-	alpha = ROOT.Double(0.)
-	alphaG.GetPoint(0,x,alpha)
-	scalesigma = ROOT.Double(0.)
-	scalesigmaG.GetPoint(0,x,scalesigma)
-	sigfrac = ROOT.Double(0.)
-	sigfracG.GetPoint(0,x,sigfrac)
-	sign = ROOT.Double(0.)
-	signG.GetPoint(0,x,sign)
-		
-	
-	meanVar = "_".join(["MEAN",name,self.tag])
+    
+        f = ROOT.TFile(jsonFile,'READ')
+        meanG = f.Get('mean')
+        sigmaG = f.Get('sigma')
+        alphaG = f.Get('alpha')
+        scalesigmaG = f.Get('scalesigma')
+        sigfracG = f.Get('sigfrac')
+        signG = f.Get('sign')
+        
+        x = ROOT.Double(0.)
+        mean = ROOT.Double(0.)
+        meanG.GetPoint(0,x,mean)
+        sigma = ROOT.Double(0.)
+        sigmaG.GetPoint(0,x,sigma)  
+        alpha = ROOT.Double(0.)
+        alphaG.GetPoint(0,x,alpha)
+        scalesigma = ROOT.Double(0.)
+        scalesigmaG.GetPoint(0,x,scalesigma)
+        sigfrac = ROOT.Double(0.)
+        sigfracG.GetPoint(0,x,sigfrac)
+        sign = ROOT.Double(0.)
+        signG.GetPoint(0,x,sign)
+            
+        
+        meanVar = "_".join(["MEAN",name,self.tag])
         self.w.factory("expr::{name}('{param}*(1+{vv_syst})',{vv_systs},{param})".format(name=meanVar,param=mean,vv_syst=scaleStr,vv_systs=','.join(scaleSysts)))
 
         sigmaVar = "_".join(["SIGMA",name,self.tag])
-	self.w.factory("expr::{name}('{param}*(1+{vv_syst})',{vv_systs},{param})".format(name=sigmaVar,param=sigma,vv_syst=resolutionStr,vv_systs=','.join(resolutionSysts)))
-		
-	alphaVar = "_".join(["ALPHA",name,self.tag])		
+        self.w.factory("expr::{name}('{param}*(1+{vv_syst})',{vv_systs},{param})".format(name=sigmaVar,param=sigma,vv_syst=resolutionStr,vv_systs=','.join(resolutionSysts)))
+            
+        alphaVar = "_".join(["ALPHA",name,self.tag])        
         alpha = ROOT.RooRealVar(alphaVar,alphaVar,alpha)
-	getattr(self.w,'import')(alpha,ROOT.RooFit.Rename(alphaVar))
-	
-	sigfracVar = "_".join(["SIGFRAC",name,self.tag])
-	sigfrac = ROOT.RooRealVar(sigfracVar,sigfracVar,sigfrac)
-	getattr(self.w,'import')(sigfrac,ROOT.RooFit.Rename(sigfracVar))
-	
-	scalesigmaVar = "_".join(["SCALESIGMA",name,self.tag])
-	scalesigma = ROOT.RooRealVar(scalesigmaVar,scalesigmaVar,scalesigma)
-	getattr(self.w,'import')(scalesigma,ROOT.RooFit.Rename(scalesigmaVar))
-	
-	signVar = "_".join(["SIGN",name,self.tag])
-	sign = ROOT.RooRealVar(signVar,signVar,sign)	
-	getattr(self.w,'import')(sign,ROOT.RooFit.Rename(signVar))
+        getattr(self.w,'import')(alpha,ROOT.RooFit.Rename(alphaVar))
+        
+        sigfracVar = "_".join(["SIGFRAC",name,self.tag])
+        sigfrac = ROOT.RooRealVar(sigfracVar,sigfracVar,sigfrac)
+        getattr(self.w,'import')(sigfrac,ROOT.RooFit.Rename(sigfracVar))
+        
+        scalesigmaVar = "_".join(["SCALESIGMA",name,self.tag])
+        scalesigma = ROOT.RooRealVar(scalesigmaVar,scalesigmaVar,scalesigma)
+        getattr(self.w,'import')(scalesigma,ROOT.RooFit.Rename(scalesigmaVar))
+        
+        signVar = "_".join(["SIGN",name,self.tag])
+        sign = ROOT.RooRealVar(signVar,signVar,sign)    
+        getattr(self.w,'import')(sign,ROOT.RooFit.Rename(signVar))
 
-        gsigmaVar = "_".join(["GSIGMA",name,self.tag])		
+        gsigmaVar = "_".join(["GSIGMA",name,self.tag])      
         gsigma = ROOT.RooFormulaVar(gsigmaVar,"@0*@1", ROOT.RooArgList(self.w.function(sigmaVar),scalesigma))
         #getattr(self.w,'import')(gsigma,ROOT.RooFit.Rename(gsigmaVar))      
 
-        gaussFunc = "_".join(["gauss",name,self.tag])	
+        gaussFunc = "_".join(["gauss",name,self.tag])   
         gauss = ROOT.RooGaussian(gaussFunc, gaussFunc, self.w.var(variable), self.w.function(meanVar), gsigma)
-	cbFunc = "_".join(["cb",name,self.tag])
+        cbFunc = "_".join(["cb",name,self.tag])
         cb    = ROOT.RooCBShape(cbFunc, cbFunc,self.w.var(variable), self.w.function(meanVar), self.w.function(sigmaVar), alpha, sign)
-        model = ROOT.RooAddPdf(pdfName, pdfName, gauss, cb, self.w.var(sigfracVar))	
+        model = ROOT.RooAddPdf(pdfName, pdfName, gauss, cb, self.w.var(sigfracVar)) 
         getattr(self.w,'import')(model,ROOT.RooFit.Rename(pdfName))
 
     def addQCDShape(self,name,variable,preconstrains,nPars=4):
 
         pdfName=name+"_"+self.tag
-	
+    
         MVV=variable
         if self.w.var(MVV) == None: self.w.factory(MVV+"[0,10000]")
-	
-	f = ROOT.TFile.Open(preconstrains,'READ')
-	parsG = [f.Get('p%i'%i) for i in range(1,nPars+1)]
-	pars_val = [ROOT.Double(0.) for i in range(0,nPars)]       
+    
+        f = ROOT.TFile.Open(preconstrains,'READ')
+        parsG = [f.Get('p%i'%i) for i in range(1,nPars+1)]
+        pars_val = [ROOT.Double(0.) for i in range(0,nPars)]       
         for i in range(1,nPars+1):
-	 x = ROOT.Double(0.)
-	 parsG[i-1].GetPoint(0,x,pars_val[i-1])
-	 pName="_".join(["CMS_JJ_p%i"%i,self.tag])
-	 errUp=pars_val[i-1]+parsG[i-1].GetErrorYhigh(0)*100.
-	 errDown=pars_val[i-1]-parsG[i-1].GetErrorYlow(0)*100.
-	 print i,pName,pars_val[i-1],parsG[i-1].GetErrorYhigh(0),parsG[i-1].GetErrorYlow(0),errUp,errDown
-         self.w.factory("{name}[{val},{errDown},{errUp}]".format(name=pName,val=pars_val[i-1],errUp=errUp,errDown=errDown))
-	
-	if nPars==2: model = ROOT.RooGenericPdf(pdfName, "pow(1-@0/13000., @1)/pow(@0/13000., @2)", ROOT.RooArgList(self.w.var(MVV), self.w.var("CMS_JJ_p1_%s"%self.tag), self.w.var("CMS_JJ_p2_%s"%self.tag)))	 
-	elif nPars==3: model = ROOT.RooGenericPdf(pdfName, "pow(1-@0/13000., @1)/pow(@0/13000., @2+@3*log(@0/13000.))", ROOT.RooArgList(self.w.var(MVV), self.w.var("CMS_JJ_p1_%s"%self.tag), self.w.var("CMS_JJ_p2_%s"%self.tag), self.w.var("CMS_JJ_p3_%s"%self.tag)))
-	elif nPars==4: model = ROOT.RooGenericPdf(pdfName, "pow(1-@0/13000., @1)/ ( pow(@0/13000., @2+@3*log(@0/13000.)+@4*pow(log(@0/13000.),2)) )", ROOT.RooArgList(self.w.var(MVV), self.w.var("CMS_JJ_p1_%s"%self.tag), self.w.var("CMS_JJ_p2_%s"%self.tag), self.w.var("CMS_JJ_p3_%s"%self.tag), self.w.var("CMS_JJ_p4_%s"%self.tag)))
+            x = ROOT.Double(0.)
+            parsG[i-1].GetPoint(0,x,pars_val[i-1])
+            pName="_".join(["CMS_JJ_p%i"%i,self.tag])
+            errUp=pars_val[i-1]+parsG[i-1].GetErrorYhigh(0)*100.
+            errDown=pars_val[i-1]-parsG[i-1].GetErrorYlow(0)*100.
+            print i,pName,pars_val[i-1],parsG[i-1].GetErrorYhigh(0),parsG[i-1].GetErrorYlow(0),errUp,errDown
+            self.w.factory("{name}[{val},{errDown},{errUp}]".format(name=pName,val=pars_val[i-1],errUp=errUp,errDown=errDown))
+    
+        if nPars==2: model = ROOT.RooGenericPdf(pdfName, "pow(1-@0/13000., @1)/pow(@0/13000., @2)", 
+                ROOT.RooArgList(self.w.var(MVV), self.w.var("CMS_JJ_p1_%s"%self.tag), self.w.var("CMS_JJ_p2_%s"%self.tag)))  
+        elif nPars==3: model = ROOT.RooGenericPdf(pdfName, "pow(1-@0/13000., @1)/pow(@0/13000., @2+@3*log(@0/13000.))", 
+            ROOT.RooArgList(self.w.var(MVV), self.w.var("CMS_JJ_p1_%s"%self.tag), self.w.var("CMS_JJ_p2_%s"%self.tag), self.w.var("CMS_JJ_p3_%s"%self.tag)))
+        elif nPars==4: model = ROOT.RooGenericPdf(pdfName, "pow(1-@0/13000., @1)/ ( pow(@0/13000., @2+@3*log(@0/13000.)+@4*pow(log(@0/13000.),2)) )", 
+            ROOT.RooArgList(self.w.var(MVV), self.w.var("CMS_JJ_p1_%s"%self.tag), self.w.var("CMS_JJ_p2_%s"%self.tag), self.w.var("CMS_JJ_p3_%s"%self.tag), self.w.var("CMS_JJ_p4_%s"%self.tag)))
 
         getattr(self.w,'import')(model,ROOT.RooFit.Rename(pdfName))
 
     def addQCDShapeNoTag(self,name,variable,preconstrains,nPars=4):
 
         pdfName=name+"_"+self.tag
-	
+    
         MVV=variable
         if self.w.var(MVV) == None: self.w.factory(MVV+"[0,10000]")
-	
-	f = ROOT.TFile.Open(preconstrains,'READ')
-	parsG = [f.Get('p%i'%i) for i in range(1,nPars+1)]
-	pars_val = [ROOT.Double(0.) for i in range(0,nPars)]       
+    
+        print("npars", nPars)
+
+        print("fname ", preconstrains)
+        f = ROOT.TFile.Open(preconstrains,'READ')
+        f.ls()
+        parsG = [f.Get('p%i'%i) for i in range(1,nPars+1)]
+        print(parsG)
+        pars_val = [ROOT.Double(0.) for i in range(0,nPars)]       
         for i in range(1,nPars+1):
-	 x = ROOT.Double(0.)
-	 parsG[i-1].GetPoint(0,x,pars_val[i-1])
-	 pName="CMS_JJ_p%i"%i
-	 errUp=pars_val[i-1]+parsG[i-1].GetErrorYhigh(0)*100.
-	 errDown=pars_val[i-1]-parsG[i-1].GetErrorYlow(0)*100.
-	 print i,pName,pars_val[i-1],parsG[i-1].GetErrorYhigh(0),parsG[i-1].GetErrorYlow(0),errUp,errDown
-         self.w.factory("{name}[{val},{errDown},{errUp}]".format(name=pName,val=pars_val[i-1],errUp=errUp,errDown=errDown))
-	
-	if nPars==2: model = ROOT.RooGenericPdf(pdfName, "pow(1-@0/13000., @1)/pow(@0/13000., @2)", ROOT.RooArgList(self.w.var(MVV), self.w.var("CMS_JJ_p1"), self.w.var("CMS_JJ_p2")))	 
-	elif nPars==3: model = ROOT.RooGenericPdf(pdfName, "pow(1-@0/13000., @1)/pow(@0/13000., @2+@3*log(@0/13000.))", ROOT.RooArgList(self.w.var(MVV), self.w.var("CMS_JJ_p1"), self.w.var("CMS_JJ_p2"), self.w.var("CMS_JJ_p3")))
-	elif nPars==4: model = ROOT.RooGenericPdf(pdfName, "pow(1-@0/13000., @1)/ ( pow(@0/13000., @2+@3*log(@0/13000.)+@4*pow(log(@0/13000.),2)) )", ROOT.RooArgList(self.w.var(MVV), self.w.var("CMS_JJ_p1"), self.w.var("CMS_JJ_p2"), self.w.var("CMS_JJ_p3"), self.w.var("CMS_JJ_p4")))
+            x = ROOT.Double(0.)
+            parsG[i-1].GetPoint(0,x,pars_val[i-1])
+            pName="CMS_JJ_p%i"%i
+            errUp=pars_val[i-1]+parsG[i-1].GetErrorYhigh(0)*100.
+            errDown=pars_val[i-1]-parsG[i-1].GetErrorYlow(0)*100.
+            print i,pName,pars_val[i-1],parsG[i-1].GetErrorYhigh(0),parsG[i-1].GetErrorYlow(0),errUp,errDown
+            self.w.factory("{name}[{val},{errDown},{errUp}]".format(name=pName,val=pars_val[i-1],errUp=errUp,errDown=errDown))
+    
+        if nPars==2: model = ROOT.RooGenericPdf(pdfName, "pow(1-@0/13000., @1)/pow(@0/13000., @2)", ROOT.RooArgList(self.w.var(MVV), self.w.var("CMS_JJ_p1"), self.w.var("CMS_JJ_p2")))  
+        elif nPars==3: model = ROOT.RooGenericPdf(pdfName, "pow(1-@0/13000., @1)/pow(@0/13000., @2+@3*log(@0/13000.))", ROOT.RooArgList(self.w.var(MVV), self.w.var("CMS_JJ_p1"), self.w.var("CMS_JJ_p2"), self.w.var("CMS_JJ_p3")))
+        elif nPars==4: model = ROOT.RooGenericPdf(pdfName, "pow(1-@0/13000., @1)/ ( pow(@0/13000., @2+@3*log(@0/13000.)+@4*pow(log(@0/13000.),2)) )", ROOT.RooArgList(self.w.var(MVV), self.w.var("CMS_JJ_p1"), self.w.var("CMS_JJ_p2"), self.w.var("CMS_JJ_p3"), self.w.var("CMS_JJ_p4")))
 
         getattr(self.w,'import')(model,ROOT.RooFit.Rename(pdfName))

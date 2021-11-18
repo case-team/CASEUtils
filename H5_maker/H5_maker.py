@@ -6,6 +6,8 @@ import numpy as np
 import h5py
 from optparse import OptionParser
 import sys
+import utils
+
 
 from PhysicsTools.NanoAODTools.postprocessing.framework.datamodel import *
 from PhysicsTools.NanoAODTools.postprocessing.framework.postprocessor import PostProcessor
@@ -17,10 +19,6 @@ from PhysicsTools.NanoAODTools.postprocessing.framework.preskimming import preSk
 
 
 
-def append_h5(f, name, data):
-    prev_size = f[name].shape[0]
-    f[name].resize(( prev_size + data.shape[0]), axis=0)
-    f[name][prev_size:] = data
 
 
 def nPFCounter(index, event):
@@ -35,7 +33,7 @@ def nPFCounter(index, event):
 
 
 class Outputer:
-    def __init__(self, outputFileName="out.root", batch_size = 5000, truth_label = 0, sample_type="MC"):
+    def __init__(self, outputFileName="out.root", batch_size = 5000, truth_label = 0, sample_type="MC", include_systematics = False):
         self.batch_size = batch_size
         self.output_name = outputFileName
         self.sample_type = sample_type
@@ -44,6 +42,7 @@ class Outputer:
         self.idx = 0
         self.nBatch = 0
         self.n_pf_cands = 100 #how many PF candidates to save (max)
+        self.include_systematics = include_systematics
         self.reset()
 
     def reset(self):
@@ -168,13 +167,13 @@ class Outputer:
 
         else:
             with h5py.File(self.output_name, "a") as f:
-                append_h5(f,'truth_label',truth_label_write)
-                append_h5(f,'event_info',self.event_info)
-                append_h5(f,'jet_kinematics',self.jet_kinematics)
-                append_h5(f,'jet1_extraInfo',self.jet1_extraInfo)
-                append_h5(f,'jet2_extraInfo',self.jet2_extraInfo)
-                append_h5(f,'jet1_PFCands',self.jet1_PFCands)
-                append_h5(f,'jet2_PFCands',self.jet2_PFCands)
+                utils.append_h5(f,'truth_label',truth_label_write)
+                utils.append_h5(f,'event_info',self.event_info)
+                utils.append_h5(f,'jet_kinematics',self.jet_kinematics)
+                utils.append_h5(f,'jet1_extraInfo',self.jet1_extraInfo)
+                utils.append_h5(f,'jet2_extraInfo',self.jet2_extraInfo)
+                utils.append_h5(f,'jet1_PFCands',self.jet1_PFCands)
+                utils.append_h5(f,'jet2_PFCands',self.jet2_PFCands)
 
         self.reset()
 
@@ -191,6 +190,78 @@ class Outputer:
         self.write_out()
         with h5py.File(self.output_name, "a") as f:
             f.create_dataset("preselection_eff", data=np.array([eff]))
+
+#class SysHelper():
+#    def __init__(self, year):
+#        self.year = year
+#
+#        #get pileup scalefactors
+#        #get JER/JEC/JMR corrections
+#
+#
+#    def get_hist_weight(self, h, x):
+#        bin_ = max(1, h.GetXaxis().FindBin(x))
+#        return h.GetBinContent(bin_)
+#
+#    def get_pileup_weight(self, nPV, variation =0):
+#
+#        if(variation == 0):
+#            h = self.pu_weights
+#        elif(variation == 1):
+#            h = self.pu_weights_up
+#        elif(variation == -1):
+#            h = self.pu_weights_down
+#        else:
+#            print("Invalid Pu label %s" % label)
+#            return 1.
+#
+#        return self.get_hist_weight(h,nPV)
+#
+#    def get_prefire_prob(self, h, pt, eta, variation = 0):
+#        min_pt = 20.
+#        max_pt = 499.
+#        min_eta = 2.0
+#        max_eta = 3.0
+#        if(pt < min_pt or abs(eta) < min_eta or abs(eta) > max_eta):
+#            return 0.
+#
+#        pt =  min(pt, max_pt)
+#        gbin = h.FindBin(eta, pt)
+#        prob = h.GetBinContent(gbin)
+#
+#        stat = h.GetBinError(gbin)
+#        syst = 0.2*prob
+#
+#        if(variation == 1):
+#            prob = min(prob + (stat**2 + syst**2)**0.5, 1.0)
+#        elif(variation == -1):
+#            prob = max(prob - (stat**2 + syst**2)**0.5, 0.)
+#        return prob
+#
+#
+#
+#
+#
+#
+#    def get_prefire_weight(self, jets = None, electrons = None, photons = None, variation = 0):
+#
+#        pf = 1.0
+#        if(electrons is not None):
+#            for j in objs:
+#                pf *= 1. - self.get_prefire_prob(self.h_prefire_jet, jet.Pt, jet.Eta, variation)
+#
+#        if(electrons is not None):
+#            for el in electrons:
+#                pf *= 1. - self.get_prefire_prob(self.h_prefire_em, jet.Pt, jet.Eta, variation)
+#
+#        if(photons is not None):
+#            for phot in photons:
+#                pf *= 1. - self.get_prefire_prob(self.h_prefire_em, jet.Pt, jet.Eta, variation)
+#
+#        return pf
+
+
+
 
 
 def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.root", json = '', year = 2016, nEventsMax = -1, sampleType = "MC"):
@@ -242,6 +313,9 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
     print("Will run over %i files and output to %s with truth label %i" % (nFiles, outputFileName, process_flag))
     count = 0
     saved = 0
+
+    if(include_systematics):
+        helper = SysHelper(year)
 
 #----------------- Begin loop over files ---------------------------------
 
@@ -325,6 +399,45 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             #ElectronsCol = Collection(event, "Electron")
             #PhotonsCol = Collection(event, "Photon")
             subjets = Collection(event, "SubJet")
+
+            #if(include_systematics):
+
+            #    pdf_weights = Collection(event, "LHEPdfWeight")
+            #    #PDF's
+            #    if(hessian): #eigenvals of hessian saved, add in quadrature
+            #        base_val = pdf_weights.LHEPdfWeight[0]
+            #        sum_sqs = 0.
+            #        for ipdf in range(1, pdf_weights.nLHEPdfWeight):
+            #            sum_sqs += (pdf_weights.LHEPdfWeight[ipdf] - base_val)**2
+            #        stddev = sum_sqs**0.5
+
+            #    else: #replicas saved, compute std dev
+            #        avg = np.mean(pdf_weights.LHEPdfWeight)
+            #        for ipdf in range(1, pdf_weights.nLHEPdfWeight):
+            #            sum_sqs += (pdf_weights.LHEPdfWeight[ipdf] - avg)**2
+
+            #        stddev = (sum_sqs/pdf_weights.nLHPdfWeight - 1) ** 0.5
+
+            #    pdf_up = min(10., 1.0 + stddev)
+            #    pdf_down = max(0., 1.0 - stddev)
+
+            #    #Pileup
+            #    pu = Collection(event, "Pileup")
+            #    pu_weight = helper.get_pileup_weight(pu.nTrueInt)
+            #    pu_weight_up = helper.get_pileup_weight(pu.nTrueInt, "up")
+            #    pu_weight_down = helper.get_pileup_weight(pu.nTrueInt, "down")
+
+            #    #prefire weight
+            #    #https://twiki.cern.ch/twiki/bin/viewauth/CMS/L1PrefiringWeightRecipe
+
+            #    prefire_weight_nom = helper.get_prefire_weight(jets = AK8Jets, variation = 0)
+            #    prefire_weight_up = helper.get_prefire_weight(jets = AK8Jets, variation = 1)
+            #    prefire_weight_down = helper.get_prefire_weight(jets = AK8Jets, variation = -1)
+
+
+                
+
+
 
             jet_min_pt = 200
             #keep 2 jets with pt > 200, tight id
