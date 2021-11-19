@@ -3,6 +3,7 @@ import utils
 import h5py
 import os
 import sys
+import copy
 
 # merge multiple h5's together (like hadd)
 # syntax is python H5_merge.py output_name.h5 input1.h5 input2.h5 input3.h5 ...
@@ -11,8 +12,8 @@ def merge(fin_name, fout_name):
     fin = h5py.File(fin_name, "r")
     fout = h5py.File(fout_name, "r+")
 
-    fin_keys = fin.keys()
-    fout_keys = fout.keys()
+    fin_keys = list(fin.keys())
+    fout_keys = list(fout.keys())
 
     if(fin_keys != fout_keys):
         print("Input and output files have different datasets!")
@@ -21,15 +22,18 @@ def merge(fin_name, fout_name):
         print("skipping this dataset")
         return
 
-    if('preselection_eff' in fin_keys):
-        fin_keys.remove("preselection_eff")
-        n_fin = float(fin[fin_keys[0]].shape[0])
-        n_fout = float(fout[fin_keys[0]].shape[0])
-        #preselection efficiency is weighted average of two files
-        fout['preselection_eff'][0] = (n_fin * fin['preselection_eff'][0] + n_fout * fout['preselection_eff'][0]) / (n_fin + n_fout)
+    for key in copy.copy(fin_keys):
+        if('_eff' in key):
+            fin_keys.remove(key)
+            n_fin = float(fin[fin_keys[0]].shape[0])
+            n_fout = float(fout[fin_keys[0]].shape[0])
+            #efficiency is weighted average of two files
+            fout[key][0] = (n_fin * fin[key][0] + n_fout * fout[key][0]) / (n_fin + n_fout)
+
 
     for key in fin_keys:
         utils.append_h5(fout, key, fin[key])
+        
 
 
 def my_copy(fin_name, fout_name):
