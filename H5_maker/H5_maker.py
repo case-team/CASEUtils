@@ -264,15 +264,15 @@ class SysHelper():
         pf = 1.0
         if(electrons is not None):
             for j in objs:
-                pf *= 1. - self.get_prefire_prob(self.h_prefire_jet, jet.Pt, jet.Eta, variation)
+                pf *= 1. - self.get_prefire_prob(self.h_prefire_jet, jet.pt, jet.eta, variation)
 
         if(electrons is not None):
             for el in electrons:
-                pf *= 1. - self.get_prefire_prob(self.h_prefire_em, jet.Pt, jet.Eta, variation)
+                pf *= 1. - self.get_prefire_prob(self.h_prefire_em, el.pt, el.eta, variation)
 
         if(photons is not None):
             for phot in photons:
-                pf *= 1. - self.get_prefire_prob(self.h_prefire_em, jet.Pt, jet.Eta, variation)
+                pf *= 1. - self.get_prefire_prob(self.h_prefire_em, phot.pt, phot.eta, variation)
 
         return pf
 
@@ -412,13 +412,12 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
                     cand.mass = FullPFCands[cand.pFCandsIdx].mass
             
             AK8Jets = Collection(event, "FatJet")
-            #MuonsCol = Collection(event, "Muon")
-            #ElectronsCol = Collection(event, "Electron")
-            #PhotonsCol = Collection(event, "Photon")
             subjets = Collection(event, "SubJet")
 
-<<<<<<< HEAD
             if(include_systematics):
+                ElectronsCol = Collection(event, "Electron")
+                PhotonsCol = Collection(event, "Photon")
+                MuonsCol = Collection(event, "Muon")
 
                 pdf_weights = Collection(event, "LHEPdfWeight")
                 #PDF's
