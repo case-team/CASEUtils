@@ -412,6 +412,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
                     cand.mass = FullPFCands[cand.pFCandsIdx].mass
             
             AK8Jets = Collection(event, "FatJet")
+            AK4Jets = Collection(event, "Jet")
             subjets = Collection(event, "SubJet")
 
             if(include_systematics):
@@ -447,9 +448,9 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
                 #prefire weight
                 #https://twiki.cern.ch/twiki/bin/viewauth/CMS/L1PrefiringWeightRecipe
 
-                prefire_weight_nom = helper.get_prefire_weight(jets = AK8Jets, variation = 0)
-                prefire_weight_up = helper.get_prefire_weight(jets = AK8Jets, variation = 1)
-                prefire_weight_down = helper.get_prefire_weight(jets = AK8Jets, variation = -1)
+                prefire_weight_nom = helper.get_prefire_weight(jets = AK4Jets, variation = 0)
+                prefire_weight_up = helper.get_prefire_weight(jets = AK4Jets, variation = 1)
+                prefire_weight_down = helper.get_prefire_weight(jets = AK4Jets, variation = -1)
 
 
                 
