@@ -37,7 +37,7 @@ The data in each keys are:
 
 **truth\_label** :  single int. Labels  the type of event. 0 is QCD, signals are => 1 (depends on dataset), other backgrounds are TBD but will be < 0
 
-**event\_info** : 6 floats. [eventNum, MET, MET\_phi, genWeight, leptonic\_decay, run]
+**event\_info** : 6 floats. [eventNum, MET, MET\_phi, genWeight, leptonic\_decay, runNum]
 leptonic decay is a flag that will check the generator level
 decay to see if it is leptonic / semi-leptonic or not (1 for leptonic, 0 for full hadronic)
 
