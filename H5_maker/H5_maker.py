@@ -56,25 +56,22 @@ class Outputer:
         self.event_info = np.zeros((self.batch_size, 6), dtype=np.float32)
 
 
-    def is_leptonic_decay(self, inTree):
+    def is_leptonic_decay(self, event):
     #leptonic decays = generator level lepton coming from a particle with mass > 20 GeV
     #not perfect but works pretty well testing on Wkk and W' grav samples
 
-        GenParts_pdgId=inTree.readBranch('GenPart_pdgId')
-        GenParts_status=inTree.readBranch('GenPart_status')
-        GenParts_mass=inTree.readBranch('GenPart_mass')
-        GenParts_mother=inTree.readBranch('GenPart_genPartIdxMother')
-        nGenParts=inTree.readBranch('nGenPart')       
+        nGenParts =event.nGenPart
 
-        for p in range(nGenParts):
-            m = GenParts_mother[p]
+        GenPartsColl = Collection(event, "GenPart")
+
+        for genPart in GenPartsColl:
+            m = genPart.genPartIdxMother
             if(m < 0 or abs(m) > nGenParts):
                 continue
-            elif abs(GenParts_pdgId[p]) > 11 and abs(GenParts_pdgId[p]) < 18 and GenParts_mass[abs(m)]>20: 
+            elif abs(genPart.pdgId) > 11 and abs(genPart.pdgId) < 18 and GenPartsColl[m].mass > 20: 
                 return True
-         
+
         return False
-        return 0
 
     def get_pfcands_sorted(self, pfcands):
         
@@ -86,14 +83,14 @@ class Outputer:
         return pfcands.astype(np.float16)
             
     
-    def fill_event(self, inTree, jet1, jet2, jet3, PFCands, subjets, mjj):
+    def fill_event(self, inTree, event, jet1, jet2, jet3, PFCands, subjets, mjj):
 
         if self.sample_type == "data":
             genWeight = 1
             leptonic_decay = False
         else:
             genWeight = inTree.readBranch('genWeight')
-            leptonic_decay = self.is_leptonic_decay(inTree)
+            leptonic_decay = self.is_leptonic_decay(event)
         
         MET = inTree.readBranch('MET_pt')
         MET_phi = inTree.readBranch('MET_phi')
@@ -507,7 +504,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
         
 
             saved+=1
-            out.fill_event(inTree, jet1, jet2, jet3, PFCands, subjets, mjj)
+            out.fill_event(inTree, event, jet1, jet2, jet3, PFCands, subjets, mjj)
             if(nEventsMax > 0 and saved >= nEventsMax): break
 # -------- End Loop over tree-------------------------------------
 # -------- End Loop over files-------------------------------------

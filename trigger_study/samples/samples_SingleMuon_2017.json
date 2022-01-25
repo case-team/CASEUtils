@@ -1,0 +1,10 @@
+{
+"SingleMuon_2017_B": "/SingleMuon/Run2017B-UL2017_MiniAODv1_NanoAODv2-v1/NANOAOD",
+"SingleMuon_2017_C": "/SingleMuon/Run2017C-UL2017_MiniAODv1_NanoAODv2-v1/NANOAOD",
+"SingleMuon_2017_D": "/SingleMuon/Run2017D-UL2017_MiniAODv1_NanoAODv2-v1/NANOAOD",
+"SingleMuon_2017_E": "/SingleMuon/Run2017E-UL2017_MiniAODv1_NanoAODv2-v2/NANOAOD",
+"SingleMuon_2017_F": "/SingleMuon/Run2017F-UL2017_MiniAODv1_NanoAODv2-v2/NANOAOD",
+"SingleMuon_2017_G": "/SingleMuon/Run2017G-UL2017_MiniAODv1_NanoAODv2-v1/NANOAOD",
+"SingleMuon_2017_H": "/SingleMuon/Run2017H-UL2017_LowPU_MiniAODv1_NanoAODv2-v1/NANOAOD"
+}
+
