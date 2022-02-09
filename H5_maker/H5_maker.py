@@ -94,8 +94,8 @@ class Outputer:
         self.jet_kinematics = np.zeros((self.batch_size, 14), dtype=np.float32)
         self.event_info = np.zeros((self.batch_size, 6), dtype=np.float32)
         self.sys_weights = np.zeros((self.batch_size, 19), dtype=np.float32)
-        self.j1_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
-        self.j2_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
+        self.jet1_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
+        self.jet2_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
 
 
     def is_leptonic_decay(self, event):
@@ -149,8 +149,8 @@ class Outputer:
 
 
         sys_weights = []
-        j1_JME_vars = []
-        j2_JME_vars = []
+        jet1_JME_vars = []
+        jet2_JME_vars = []
         if(self.include_systematics):
             #These branches are not in the regualr PFNano/Pancakes should have been added by TIMBER
 
@@ -252,58 +252,58 @@ class Outputer:
 
 
             #systematics
-            j1_pt_JES_up = inTree.readBranch("FatJet1_pt_JES_up")
-            j2_pt_JES_up = inTree.readBranch("FatJet2_pt_JES_up")
-            j1_msoftdrop_JES_up = inTree.readBranch("FatJet1_msoftdrop_JES_up")
-            j2_msoftdrop_JES_up = inTree.readBranch("FatJet2_msoftdrop_JES_up")
+            jet1_pt_JES_up = inTree.readBranch("FatJet1_pt_JES_up")
+            jet2_pt_JES_up = inTree.readBranch("FatJet2_pt_JES_up")
+            jet1_msoftdrop_JES_up = inTree.readBranch("FatJet1_msoftdrop_JES_up")
+            jet2_msoftdrop_JES_up = inTree.readBranch("FatJet2_msoftdrop_JES_up")
 
-            j1_pt_JES_down = inTree.readBranch("FatJet1_pt_JES_down")
-            j2_pt_JES_down = inTree.readBranch("FatJet2_pt_JES_down")
-            j1_msoftdrop_JES_down = inTree.readBranch("FatJet1_msoftdrop_JES_down")
-            j2_msoftdrop_JES_down = inTree.readBranch("FatJet2_msoftdrop_JES_down")
+            jet1_pt_JES_down = inTree.readBranch("FatJet1_pt_JES_down")
+            jet2_pt_JES_down = inTree.readBranch("FatJet2_pt_JES_down")
+            jet1_msoftdrop_JES_down = inTree.readBranch("FatJet1_msoftdrop_JES_down")
+            jet2_msoftdrop_JES_down = inTree.readBranch("FatJet2_msoftdrop_JES_down")
 
-            j1_pt_JER_up = inTree.readBranch("FatJet1_pt_JER_up")
-            j2_pt_JER_up = inTree.readBranch("FatJet2_pt_JER_up")
-            j1_msoftdrop_JER_up = inTree.readBranch("FatJet1_msoftdrop_JER_up")
-            j2_msoftdrop_JER_up = inTree.readBranch("FatJet2_msoftdrop_JER_up")
+            jet1_pt_JER_up = inTree.readBranch("FatJet1_pt_JER_up")
+            jet2_pt_JER_up = inTree.readBranch("FatJet2_pt_JER_up")
+            jet1_msoftdrop_JER_up = inTree.readBranch("FatJet1_msoftdrop_JER_up")
+            jet2_msoftdrop_JER_up = inTree.readBranch("FatJet2_msoftdrop_JER_up")
 
-            j1_pt_JER_down = inTree.readBranch("FatJet1_pt_JER_down")
-            j2_pt_JER_down = inTree.readBranch("FatJet2_pt_JER_down")
-            j1_msoftdrop_JER_down = inTree.readBranch("FatJet1_msoftdrop_JER_down")
-            j2_msoftdrop_JER_down = inTree.readBranch("FatJet2_msoftdrop_JER_down")
+            jet1_pt_JER_down = inTree.readBranch("FatJet1_pt_JER_down")
+            jet2_pt_JER_down = inTree.readBranch("FatJet2_pt_JER_down")
+            jet1_msoftdrop_JER_down = inTree.readBranch("FatJet1_msoftdrop_JER_down")
+            jet2_msoftdrop_JER_down = inTree.readBranch("FatJet2_msoftdrop_JER_down")
 
-            j1_msoftdrop_JMS_up = inTree.readBranch("FatJet1_msoftdrop_JMS_up")
-            j2_msoftdrop_JMS_up = inTree.readBranch("FatJet2_msoftdrop_JMS_up")
+            jet1_msoftdrop_JMS_up = inTree.readBranch("FatJet1_msoftdrop_JMS_up")
+            jet2_msoftdrop_JMS_up = inTree.readBranch("FatJet2_msoftdrop_JMS_up")
 
-            j1_msoftdrop_JMS_down = inTree.readBranch("FatJet1_msoftdrop_JMS_down")
-            j2_msoftdrop_JMS_down = inTree.readBranch("FatJet2_msoftdrop_JMS_down")
+            jet1_msoftdrop_JMS_down = inTree.readBranch("FatJet1_msoftdrop_JMS_down")
+            jet2_msoftdrop_JMS_down = inTree.readBranch("FatJet2_msoftdrop_JMS_down")
 
-            j1_msoftdrop_JMR_up = inTree.readBranch("FatJet1_msoftdrop_JMR_up")
-            j2_msoftdrop_JMR_up = inTree.readBranch("FatJet2_msoftdrop_JMR_up")
+            jet1_msoftdrop_JMR_up = inTree.readBranch("FatJet1_msoftdrop_JMR_up")
+            jet2_msoftdrop_JMR_up = inTree.readBranch("FatJet2_msoftdrop_JMR_up")
 
-            j1_msoftdrop_JMR_down = inTree.readBranch("FatJet1_msoftdrop_JMR_down")
-            j2_msoftdrop_JMR_down = inTree.readBranch("FatJet2_msoftdrop_JMR_down")
+            jet1_msoftdrop_JMR_down = inTree.readBranch("FatJet1_msoftdrop_JMR_down")
+            jet2_msoftdrop_JMR_down = inTree.readBranch("FatJet2_msoftdrop_JMR_down")
 
 
 
-            j1_JME_vars = [j1_pt_JES_up, j1_msoftdrop_JES_up, j1_pt_JES_down, j1_msoftdrop_JES_down, 
-                           j1_pt_JER_up, j1_msoftdrop_JER_up, j1_pt_JER_down, j1_msoftdrop_JER_down,
-                           j1_msoftdrop_JMS_up, j1_msoftdrop_JMS_down, j1_msoftdrop_JMR_up, j1_msoftdrop_JMR_down]
-            self.j1_JME_vars[self.idx] = j1_JME_vars
+            jet1_JME_vars = [jet1_pt_JES_up, jet1_msoftdrop_JES_up, jet1_pt_JES_down, jet1_msoftdrop_JES_down, 
+                           jet1_pt_JER_up, jet1_msoftdrop_JER_up, jet1_pt_JER_down, jet1_msoftdrop_JER_down,
+                           jet1_msoftdrop_JMS_up, jet1_msoftdrop_JMS_down, jet1_msoftdrop_JMR_up, jet1_msoftdrop_JMR_down]
+            self.jet1_JME_vars[self.idx] = jet1_JME_vars
 
-            j2_JME_vars = [j2_pt_JES_up, j2_msoftdrop_JES_up, j2_pt_JES_down, j2_msoftdrop_JES_down, 
-                           j2_pt_JER_up, j2_msoftdrop_JER_up, j2_pt_JER_down, j2_msoftdrop_JER_down,
-                           j2_msoftdrop_JMS_up, j2_msoftdrop_JMS_down, j2_msoftdrop_JMR_up, j2_msoftdrop_JMR_down]
-            self.j2_JME_vars[self.idx] = j2_JME_vars
+            jet2_JME_vars = [jet2_pt_JES_up, jet2_msoftdrop_JES_up, jet2_pt_JES_down, jet2_msoftdrop_JES_down, 
+                           jet2_pt_JER_up, jet2_msoftdrop_JER_up, jet2_pt_JER_down, jet2_msoftdrop_JER_down,
+                           jet2_msoftdrop_JMS_up, jet2_msoftdrop_JMS_down, jet2_msoftdrop_JMR_up, jet2_msoftdrop_JMR_down]
+            self.jet2_JME_vars[self.idx] = jet2_JME_vars
 
 
             #recompute mjj for nominal case
-            j1_4vec = ROOT.Math.PtEtaPhiMVector(jet1.pt_corr, jet1.eta, jet1.phi, jet1.msoftdrop_corr)
-            j2_4vec = ROOT.Math.PtEtaPhiMVector(jet2.pt_corr, jet2.eta, jet2.phi, jet2.msoftdrop_corr)
+            jet1_4vec = ROOT.Math.PtEtaPhiMVector(jet1.pt_corr, jet1.eta, jet1.phi, jet1.msoftdrop_corr)
+            jet2_4vec = ROOT.Math.PtEtaPhiMVector(jet2.pt_corr, jet2.eta, jet2.phi, jet2.msoftdrop_corr)
 
 
 
-            dijet = j1_4vec + j2_4vec
+            dijet = jet1_4vec + jet2_4vec
             mjj = dijet.M()
 
             
@@ -325,8 +325,8 @@ class Outputer:
         else:
             jet_kinematics.extend([0., 0., 0., 0.])
 
-        j1_nPF = min(self.n_pf_cands, jet1.nPFConstituents)
-        j2_nPF = min(self.n_pf_cands, jet2.nPFConstituents)
+        jet1_nPF = min(self.n_pf_cands, jet1.nPFConstituents)
+        jet2_nPF = min(self.n_pf_cands, jet2.nPFConstituents)
         
         #maximum deepcsv from top 2 subjets of the fatjet
         jet1_btag = jet2_btag = -1.
@@ -341,12 +341,12 @@ class Outputer:
         if(jet2.subJetIdx2 > 0):
             jet2_btag = max(jet2_btag, subjets[jet2.subJetIdx2].btagDeepB)
 
-        jet1_extraInfo = [jet1.tau1, jet1.tau2, jet1.tau3, jet1.tau4, jet1.lsf3, jet1_btag, j1_nPF]
-        jet2_extraInfo = [jet2.tau1, jet2.tau2, jet2.tau3, jet2.tau4, jet2.lsf3, jet2_btag, j2_nPF]
+        jet1_extraInfo = [jet1.tau1, jet1.tau2, jet1.tau3, jet1.tau4, jet1.lsf3, jet1_btag, jet1_nPF]
+        jet2_extraInfo = [jet2.tau1, jet2.tau2, jet2.tau3, jet2.tau4, jet2.lsf3, jet2_btag, jet2_nPF]
         #print(jet1.PFConstituents_Start, jet1.PFConstituents_Start + jet1.nPFConstituents, jet2.PFConstituents_Start, jet2.PFConstituents_Start + jet2.nPFConstituents)
 
-        range1 = range(jet1.PFConstituents_Start, jet1.PFConstituents_Start + j1_nPF, 1)
-        range2 = range(jet2.PFConstituents_Start, jet2.PFConstituents_Start + j2_nPF, 1)
+        range1 = range(jet1.PFConstituents_Start, jet1.PFConstituents_Start + jet1_nPF, 1)
+        range2 = range(jet2.PFConstituents_Start, jet2.PFConstituents_Start + jet2_nPF, 1)
         jet1_PFCands = []
         jet2_PFCands = []
         for idx in range1:
@@ -395,8 +395,8 @@ class Outputer:
                 f.create_dataset("jet2_PFCands", data=self.jet2_PFCands, chunks = True, maxshape=(None, self.jet2_PFCands.shape[1], 4), compression='gzip')
                 if(self.include_systematics):
                     f.create_dataset("sys_weights", data=self.sys_weights, chunks = True, maxshape=(None, self.sys_weights.shape[1]))
-                    f.create_dataset("j1_JME_vars", data=self.j1_JME_vars, chunks = True, maxshape=(None, self.j1_JME_vars.shape[1]))
-                    f.create_dataset("j2_JME_vars", data=self.j2_JME_vars, chunks = True, maxshape=(None, self.j2_JME_vars.shape[1]))
+                    f.create_dataset("jet1_JME_vars", data=self.jet1_JME_vars, chunks = True, maxshape=(None, self.jet1_JME_vars.shape[1]))
+                    f.create_dataset("jet2_JME_vars", data=self.jet2_JME_vars, chunks = True, maxshape=(None, self.jet2_JME_vars.shape[1]))
 
         else:
             with h5py.File(self.output_name, "a") as f:
@@ -409,8 +409,8 @@ class Outputer:
                 utils.append_h5(f,'jet2_PFCands',self.jet2_PFCands)
                 if(self.include_systematics):
                     utils.append_h5(f,'sys_weights',self.sys_weights)
-                    utils.append_h5(f,'j1_JME_vars',self.j1_JME_vars)
-                    utils.append_h5(f,'j2_JME_vars',self.j2_JME_vars)
+                    utils.append_h5(f,'jet1_JME_vars',self.jet1_JME_vars)
+                    utils.append_h5(f,'jet2_JME_vars',self.jet2_JME_vars)
 
         self.reset()
 
@@ -616,11 +616,11 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
 
 
 
-            j1_4vec = ROOT.Math.PtEtaPhiMVector(jet1.pt, jet1.eta, jet1.phi, jet1.msoftdrop)
-            j2_4vec = ROOT.Math.PtEtaPhiMVector(jet2.pt, jet2.eta, jet2.phi, jet2.msoftdrop)
+            jet1_4vec = ROOT.Math.PtEtaPhiMVector(jet1.pt, jet1.eta, jet1.phi, jet1.msoftdrop)
+            jet2_4vec = ROOT.Math.PtEtaPhiMVector(jet2.pt, jet2.eta, jet2.phi, jet2.msoftdrop)
 
 
-            dijet = j1_4vec + j2_4vec
+            dijet = jet1_4vec + jet2_4vec
             mjj = dijet.M()
 
             if(mjj< mjj_cut): continue
