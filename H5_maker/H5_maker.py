@@ -17,6 +17,44 @@ from PhysicsTools.NanoAODTools.postprocessing.framework.eventloop import eventLo
 from PhysicsTools.NanoAODTools.postprocessing.framework.preskimming import preSkim
 
 
+sys_weights_map = {
+        'nom_weight' : 0,
+        'pdf_up' : 1,
+        'pdf_down': 2,
+        'prefire_up': 3,
+        'prefire_down' : 4,
+        'pileup_up' : 5 ,
+        'pileup_down' : 6,
+        'btag_up' : 7,
+        'btag_down' : 8,
+        'PS_ISR_up' : 9,
+        'PS_ISR_down' : 10,
+        'PS_FSR_up' : 11,
+        'PS_FSR_down' : 12,
+        'F_up' : 13,
+        'F_down' : 14,
+        'R_up' : 15,
+        'R_down' : 16,
+        'RF_up' : 17,
+        'RF_down' : 18
+        }
+
+JME_vars_map = {
+        'pt_JES_up' : 0,
+        'm_JES_up' : 1,
+        'pt_JES_down' : 2,
+        'm_JES_down' : 3,
+        'pt_JER_up' : 4,
+        'm_JER_up' : 5,
+        'pt_JER_down' : 6,
+        'm_JER_down' : 7,
+        'm_JMS_up' : 8,
+        'm_JMS_down' : 9,
+        'm_JMR_up' : 10,
+        'm_JMR_down' : 11
+        }
+
+
 
 
 
@@ -33,7 +71,7 @@ def nPFCounter(index, event):
 
 
 class Outputer:
-    def __init__(self, outputFileName="out.root", batch_size = 5000, truth_label = 0, sample_type="MC", sort_pfcands = False, include_systematics = False):
+    def __init__(self, outputFileName="out.root", batch_size = 5000, truth_label = 0, sample_type="MC", sort_pfcands = False, include_systematics = False, year = 2017):
         self.batch_size = batch_size
         self.output_name = outputFileName
         self.sample_type = sample_type
@@ -44,6 +82,7 @@ class Outputer:
         self.n_pf_cands = 100 #how many PF candidates to save (max)
         self.include_systematics = include_systematics
         self.sort_pfcands = sort_pfcands
+        self.year = year
         self.reset()
 
     def reset(self):
@@ -54,6 +93,9 @@ class Outputer:
         self.jet2_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
         self.jet_kinematics = np.zeros((self.batch_size, 14), dtype=np.float32)
         self.event_info = np.zeros((self.batch_size, 6), dtype=np.float32)
+        self.sys_weights = np.zeros((self.batch_size, 19), dtype=np.float32)
+        self.j1_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
+        self.j2_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
 
 
     def is_leptonic_decay(self, event):
@@ -99,10 +141,184 @@ class Outputer:
 
         event_info = [eventNum, MET, MET_phi, genWeight, leptonic_decay, run]
 
+        jet1.pt_corr = jet1.pt
+        jet2.pt_corr = jet2.pt
+
+        jet1.msoftdrop_corr = jet1.msoftdrop
+        jet2.msoftdrop_corr = jet2.msoftdrop
+
+
+        sys_weights = []
+        j1_JME_vars = []
+        j2_JME_vars = []
+        if(self.include_systematics):
+            #These branches are not in the regualr PFNano/Pancakes should have been added by TIMBER
+
+            #PDF's
+            pdf_up = inTree.readBranch('Pdfweight__up')
+            pdf_down = inTree.readBranch('Pdfweight__down')
+            
+            #Prefire
+            if(self.year == 2016 or self.year == 2017):
+                prefire_nom = inTree.readBranch('Prefire__nom')
+                prefire_up = inTree.readBranch('Prefire__up') / prefire_nom
+                prefire_down = inTree.readBranch('Prefire__down') / prefire_nom
+            else:
+                prefire_nom = prefire_up = prefire_down = 1.0
+
+            #Pileup
+            pileup_nom = inTree.readBranch('Pileup__nom')
+            pileup_up = inTree.readBranch('Pileup__up') / pileup_nom
+            pileup_down = inTree.readBranch('Pileup__down') / pileup_nom
+
+            #btag TODO divide out average weight so normalization unchanged?
+            btag_nom =  inTree.readBranch('lead_sjbtag_corr__nom') * inTree.readBranch('sublead_sjbtag_corr__nom')
+            btag_up =  inTree.readBranch('lead_sjbtag_corr__up') * inTree.readBranch('sublead_sjbtag_corr__up') / btag_nom
+            btag_down =  inTree.readBranch('lead_sjbtag_corr__down') * inTree.readBranch('sublead_sjbtag_corr__down') / btag_nom
+
+            #PS weights
+            #Older samples don't have
+            nPS = inTree.readBranch("nPSWeight")
+            PS_ISR_up = PS_ISR_down = PS_FSR_up = PS_FSR_down  = 1.0
+            if(nPS > 1):
+                #order https://cms-nanoaod-integration.web.cern.ch/integration/cms-swCMSSW_10_6_X/mc106Xul17_doc.html
+                PS_weights = inTree.readBranch("PSWeight")
+                PS_ISR_up = PS_weights[0]
+                PS_FSR_up = PS_weights[1]
+                PS_ISR_down = PS_weights[2]
+                PS_FSR_down = PS_weights[3]
+
+            #Renorm / Fac weights
+
+            nScale = inTree.readBranch("nLHEScaleWeight")
+            RF_down = R_down = F_down = F_up = R_up = RF_up = 1.
+            if(nScale > 1):
+                #order https://cms-nanoaod-integration.web.cern.ch/integration/cms-swCMSSW_10_6_X/mc106Xul17_doc.html
+                scale_weights = inTree.readBranch("LHEScaleWeight")
+                
+                RF_down = scale_weights[0]
+                R_down = scale_weights[1]
+                F_down = scale_weights[3]
+                F_up = scale_weights[5]
+                R_up = scale_weights[7]
+                RF_up = scale_weights[8]
+
+
+            gen_weight = prefire_nom * pileup_nom * btag_nom
+            sys_weights = [gen_weight, pdf_up, pdf_down, prefire_up, prefire_down, pileup_up, pileup_down, btag_up, btag_down, 
+            PS_ISR_up, PS_ISR_down, PS_FSR_up, PS_FSR_down, F_up, F_down, R_up, R_down, RF_up, RF_down]
+
+            #print(prefire_nom, pileup_nom, btag_nom)
+            #print(len(sys_weights), sys_weights)
+
+            test = event.lead_sjbtag_corr__vec
+
+            #clip extreme variations
+            self.sys_weights[self.idx] = np.clip(np.array(sys_weights, dtype=np.float32), 1e-3, 1e3)
+            #for key in sys_weights_map.keys():
+            #    print(key, self.sys_weights[self.idx, sys_weights_map[key]])
+
+            #print(jet1.msoftdrop, jet1.mass)
+
+
+            #JME Corrections 
+            #TODO actually read the corrections...
+            #pt_nom = inTree.readBranch('FatJet_pt_corr')
+            #msd_nom = inTree.readBranch('FatJet_msoftdrop_corr')
+            #dijet_idxs = inTree.readBranch("DijetIdxs")
+            dijet_idx1  = inTree.readBranch("DijetIdx1")
+            dijet_idx2  = inTree.readBranch("DijetIdx1")
+
+            if(dijet_idx1 != jet1.idx and dijet_idx2 != jet2.idx):
+                print("Dijet indices from TIMBER and this selector don't match!")
+                print("TIMBER : %i %i. This : %i %i " %(dijet_idx1, dijet_idx2, jet1.idx, jet2.idx))
+                sys.exit(1)
+
+
+
+
+
+
+            #print(pt_nom)
+            #print(msd_nom)
+            #print(dijet_idxs)
+
+            #nominal
+            jet1.pt_corr = inTree.readBranch("FatJet1_pt_corr")
+            jet2.pt_corr = inTree.readBranch("FatJet2_pt_corr")
+
+            jet1.msoftdrop_corr = inTree.readBranch("FatJet1_msoftdrop_corr")
+            jet2.msoftdrop_corr = inTree.readBranch("FatJet2_msoftdrop_corr")
+
+
+            #systematics
+            j1_pt_JES_up = inTree.readBranch("FatJet1_pt_JES_up")
+            j2_pt_JES_up = inTree.readBranch("FatJet2_pt_JES_up")
+            j1_msoftdrop_JES_up = inTree.readBranch("FatJet1_msoftdrop_JES_up")
+            j2_msoftdrop_JES_up = inTree.readBranch("FatJet2_msoftdrop_JES_up")
+
+            j1_pt_JES_down = inTree.readBranch("FatJet1_pt_JES_down")
+            j2_pt_JES_down = inTree.readBranch("FatJet2_pt_JES_down")
+            j1_msoftdrop_JES_down = inTree.readBranch("FatJet1_msoftdrop_JES_down")
+            j2_msoftdrop_JES_down = inTree.readBranch("FatJet2_msoftdrop_JES_down")
+
+            j1_pt_JER_up = inTree.readBranch("FatJet1_pt_JER_up")
+            j2_pt_JER_up = inTree.readBranch("FatJet2_pt_JER_up")
+            j1_msoftdrop_JER_up = inTree.readBranch("FatJet1_msoftdrop_JER_up")
+            j2_msoftdrop_JER_up = inTree.readBranch("FatJet2_msoftdrop_JER_up")
+
+            j1_pt_JER_down = inTree.readBranch("FatJet1_pt_JER_down")
+            j2_pt_JER_down = inTree.readBranch("FatJet2_pt_JER_down")
+            j1_msoftdrop_JER_down = inTree.readBranch("FatJet1_msoftdrop_JER_down")
+            j2_msoftdrop_JER_down = inTree.readBranch("FatJet2_msoftdrop_JER_down")
+
+            j1_msoftdrop_JMS_up = inTree.readBranch("FatJet1_msoftdrop_JMS_up")
+            j2_msoftdrop_JMS_up = inTree.readBranch("FatJet2_msoftdrop_JMS_up")
+
+            j1_msoftdrop_JMS_down = inTree.readBranch("FatJet1_msoftdrop_JMS_down")
+            j2_msoftdrop_JMS_down = inTree.readBranch("FatJet2_msoftdrop_JMS_down")
+
+            j1_msoftdrop_JMR_up = inTree.readBranch("FatJet1_msoftdrop_JMR_up")
+            j2_msoftdrop_JMR_up = inTree.readBranch("FatJet2_msoftdrop_JMR_up")
+
+            j1_msoftdrop_JMR_down = inTree.readBranch("FatJet1_msoftdrop_JMR_down")
+            j2_msoftdrop_JMR_down = inTree.readBranch("FatJet2_msoftdrop_JMR_down")
+
+
+
+            j1_JME_vars = [j1_pt_JES_up, j1_msoftdrop_JES_up, j1_pt_JES_down, j1_msoftdrop_JES_down, 
+                           j1_pt_JER_up, j1_msoftdrop_JER_up, j1_pt_JER_down, j1_msoftdrop_JER_down,
+                           j1_msoftdrop_JMS_up, j1_msoftdrop_JMS_down, j1_msoftdrop_JMR_up, j1_msoftdrop_JMR_down]
+            self.j1_JME_vars[self.idx] = j1_JME_vars
+
+            j2_JME_vars = [j2_pt_JES_up, j2_msoftdrop_JES_up, j2_pt_JES_down, j2_msoftdrop_JES_down, 
+                           j2_pt_JER_up, j2_msoftdrop_JER_up, j2_pt_JER_down, j2_msoftdrop_JER_down,
+                           j2_msoftdrop_JMS_up, j2_msoftdrop_JMS_down, j2_msoftdrop_JMR_up, j2_msoftdrop_JMR_down]
+            self.j2_JME_vars[self.idx] = j2_JME_vars
+
+
+            #recompute mjj for nominal case
+            j1_4vec = ROOT.Math.PtEtaPhiMVector(jet1.pt_corr, jet1.eta, jet1.phi, jet1.msoftdrop_corr)
+            j2_4vec = ROOT.Math.PtEtaPhiMVector(jet2.pt_corr, jet2.eta, jet2.phi, jet2.msoftdrop_corr)
+
+
+
+            dijet = j1_4vec + j2_4vec
+            mjj = dijet.M()
+
+            
+
+
+
+
+
+
         d_eta = abs(jet1.eta - jet2.eta)
 
 
-        jet_kinematics = [mjj, d_eta, jet1.pt, jet1.eta, jet1.phi, jet1.msoftdrop, jet2.pt, jet2.eta, jet2.phi, jet2.msoftdrop]
+
+
+        jet_kinematics = [mjj, d_eta, jet1.pt_corr, jet1.eta, jet1.phi, jet1.msoftdrop_corr, jet2.pt_corr, jet2.eta, jet2.phi, jet2.msoftdrop_corr]
 
         if(jet3 != None):
             jet_kinematics.extend([jet3.pt, jet3.eta, jet3.phi, jet3.msoftdrop])
@@ -177,6 +393,10 @@ class Outputer:
                 f.create_dataset("jet2_extraInfo", data=self.jet2_extraInfo, chunks = True, maxshape=(None, self.jet2_extraInfo.shape[1]))
                 f.create_dataset("jet1_PFCands", data=self.jet1_PFCands, chunks = True, maxshape=(None, self.jet1_PFCands.shape[1], 4), compression='gzip')
                 f.create_dataset("jet2_PFCands", data=self.jet2_PFCands, chunks = True, maxshape=(None, self.jet2_PFCands.shape[1], 4), compression='gzip')
+                if(self.include_systematics):
+                    f.create_dataset("sys_weights", data=self.sys_weights, chunks = True, maxshape=(None, self.sys_weights.shape[1]))
+                    f.create_dataset("j1_JME_vars", data=self.j1_JME_vars, chunks = True, maxshape=(None, self.j1_JME_vars.shape[1]))
+                    f.create_dataset("j2_JME_vars", data=self.j2_JME_vars, chunks = True, maxshape=(None, self.j2_JME_vars.shape[1]))
 
         else:
             with h5py.File(self.output_name, "a") as f:
@@ -187,6 +407,10 @@ class Outputer:
                 utils.append_h5(f,'jet2_extraInfo',self.jet2_extraInfo)
                 utils.append_h5(f,'jet1_PFCands',self.jet1_PFCands)
                 utils.append_h5(f,'jet2_PFCands',self.jet2_PFCands)
+                if(self.include_systematics):
+                    utils.append_h5(f,'sys_weights',self.sys_weights)
+                    utils.append_h5(f,'j1_JME_vars',self.j1_JME_vars)
+                    utils.append_h5(f,'j2_JME_vars',self.j2_JME_vars)
 
         self.reset()
 
@@ -204,80 +428,12 @@ class Outputer:
         with h5py.File(self.output_name, "a") as f:
             f.create_dataset("preselection_eff", data=np.array([eff]))
 
-class SysHelper():
-    def __init__(self, year):
-        self.year = year
-
-        #get pileup scalefactors
-        #get JER/JEC/JMR corrections
-
-
-    def get_hist_weight(self, h, x):
-        bin_ = max(1, h.GetXaxis().FindBin(x))
-        return h.GetBinContent(bin_)
-
-    def get_pileup_weight(self, nPV, variation =0):
-
-        if(variation == 0):
-            h = self.pu_weights
-        elif(variation == 1):
-            h = self.pu_weights_up
-        elif(variation == -1):
-            h = self.pu_weights_down
-        else:
-            print("Invalid Pu label %s" % label)
-            return 1.
-
-        return self.get_hist_weight(h,nPV)
-
-    def get_prefire_prob(self, h, pt, eta, variation = 0):
-        min_pt = 20.
-        max_pt = 499.
-        min_eta = 2.0
-        max_eta = 3.0
-        if(pt < min_pt or abs(eta) < min_eta or abs(eta) > max_eta):
-            return 0.
-
-        pt =  min(pt, max_pt)
-        gbin = h.FindBin(eta, pt)
-        prob = h.GetBinContent(gbin)
-
-        stat = h.GetBinError(gbin)
-        syst = 0.2*prob
-
-        if(variation == 1):
-            prob = min(prob + (stat**2 + syst**2)**0.5, 1.0)
-        elif(variation == -1):
-            prob = max(prob - (stat**2 + syst**2)**0.5, 0.)
-        return prob
 
 
 
 
-
-
-    def get_prefire_weight(self, jets = None, electrons = None, photons = None, variation = 0):
-
-        pf = 1.0
-        if(electrons is not None):
-            for j in objs:
-                pf *= 1. - self.get_prefire_prob(self.h_prefire_jet, jet.pt, jet.eta, variation)
-
-        if(electrons is not None):
-            for el in electrons:
-                pf *= 1. - self.get_prefire_prob(self.h_prefire_em, el.pt, el.eta, variation)
-
-        if(photons is not None):
-            for phot in photons:
-                pf *= 1. - self.get_prefire_prob(self.h_prefire_em, phot.pt, phot.eta, variation)
-
-        return pf
-
-
-
-
-
-def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.root", json = '', year = 2016, nEventsMax = -1, sampleType = "MC", sort_pfcands=False):
+def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.root", json = '', year = 2016, nEventsMax = -1, sampleType = "MC", 
+        sort_pfcands=True,  include_systematics = False):
     
     if not ((sampleType == "MC") or (sampleType=="data")):
         print("Error! sampleType needs to be set to either data or MC! Please set correct option and retry.")
@@ -324,8 +480,6 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
     count = 0
     saved = 0
 
-    if(include_systematics):
-        helper = SysHelper(year)
 
 #----------------- Begin loop over files ---------------------------------
 
@@ -339,25 +493,25 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             return 1
 
         #get input tree
-        inTree = inputFile.Get("Events")
+        TTree = inputFile.Get("Events")
 
         # pre-skimming
         if(json != ''):
-            elist,jsonFilter = preSkim(inTree, json)
+            elist,jsonFilter = preSkim(TTree, json)
 
             #number of events to be processed 
-            nTotal = elist.GetN() if elist else inTree.GetEntries()
+            nTotal = elist.GetN() if elist else TTree.GetEntries()
             
-            print('Pre-select %d entries out of %s '%(nTotal,inTree.GetEntries()))
+            print('Pre-select %d entries out of %s '%(nTotal,TTree.GetEntries()))
 
 
-            inTree= InputTree(inTree, elist) 
+            inTree= InputTree(TTree, elist) 
         else:
-            nTotal = inTree.GetEntries()
-            inTree= InputTree(inTree) 
+            nTotal = TTree.GetEntries()
+            inTree= InputTree(TTree) 
             print('Running over %i entries \n' % nTotal)
 
-        out = Outputer(outputFileName, truth_label =  process_flag, sample_type=sampleType, sort_pfcands=sort_pfcands)
+        out = Outputer(outputFileName, truth_label =  process_flag, sample_type=sampleType, sort_pfcands=sort_pfcands, include_systematics = include_systematics, year = year)
 
 
         # Grab event tree from nanoAOD
@@ -412,42 +566,6 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             AK4Jets = Collection(event, "Jet")
             subjets = Collection(event, "SubJet")
 
-            if(include_systematics):
-                ElectronsCol = Collection(event, "Electron")
-                PhotonsCol = Collection(event, "Photon")
-                MuonsCol = Collection(event, "Muon")
-
-                pdf_weights = Collection(event, "LHEPdfWeight")
-                #PDF's
-                if(hessian): #eigenvals of hessian saved, add in quadrature
-                    base_val = pdf_weights.LHEPdfWeight[0]
-                    sum_sqs = 0.
-                    for ipdf in range(1, pdf_weights.nLHEPdfWeight):
-                        sum_sqs += (pdf_weights.LHEPdfWeight[ipdf] - base_val)**2
-                    stddev = sum_sqs**0.5
-
-                else: #replicas saved, compute std dev
-                    avg = np.mean(pdf_weights.LHEPdfWeight)
-                    for ipdf in range(1, pdf_weights.nLHEPdfWeight):
-                        sum_sqs += (pdf_weights.LHEPdfWeight[ipdf] - avg)**2
-
-                    stddev = (sum_sqs/pdf_weights.nLHPdfWeight - 1) ** 0.5
-
-                pdf_up = min(10., 1.0 + stddev)
-                pdf_down = max(0., 1.0 - stddev)
-
-                #Pileup
-                pu = Collection(event, "Pileup")
-                pu_weight = helper.get_pileup_weight(pu.nTrueInt)
-                pu_weight_up = helper.get_pileup_weight(pu.nTrueInt, "up")
-                pu_weight_down = helper.get_pileup_weight(pu.nTrueInt, "down")
-
-                #prefire weight
-                #https://twiki.cern.ch/twiki/bin/viewauth/CMS/L1PrefiringWeightRecipe
-
-                prefire_weight_nom = helper.get_prefire_weight(jets = AK4Jets, variation = 0)
-                prefire_weight_up = helper.get_prefire_weight(jets = AK4Jets, variation = 1)
-                prefire_weight_down = helper.get_prefire_weight(jets = AK4Jets, variation = -1)
 
 
                 
@@ -459,7 +577,8 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
         
             pf_conts_start = 0 #keep track of indices for PF candidates
             jet_index = 0
-            for jet in AK8Jets:
+            for i,jet in enumerate(AK8Jets):
+                jet.idx = i
                 #jetId : bit1 = loose, bit2 = tight, bit3 = tightLepVeto
                 #want tight id
                 if((jet.jetId & 2 == 2) and jet.pt > jet_min_pt and abs(jet.eta) < 2.5):
@@ -494,8 +613,12 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
                 jet1 = jet2
                 jet2 = temp
 
+
+
+
             j1_4vec = ROOT.Math.PtEtaPhiMVector(jet1.pt, jet1.eta, jet1.phi, jet1.msoftdrop)
             j2_4vec = ROOT.Math.PtEtaPhiMVector(jet2.pt, jet2.eta, jet2.phi, jet2.msoftdrop)
+
 
             dijet = j1_4vec + j2_4vec
             mjj = dijet.M()

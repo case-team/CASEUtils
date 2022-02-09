@@ -146,6 +146,7 @@ class DataCardMaker:
         f=ROOT.TFile(filename)
         histogram=f.Get(histoName)
         events=histogram.Integral()*self.luminosity*constant
+
         self.contributions.append({'name':name,'pdf':pdfName,'ID':ID,'yield':events})
         return events
 
