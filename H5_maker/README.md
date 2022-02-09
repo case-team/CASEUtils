@@ -53,17 +53,19 @@ padded
 If `--sys` flag is used, additional columns with info necessary for systematics
 computation are added
 
-**sys\_weights** 19 floats: See `sys\_weights\_map` dictionary inside H5\_maker.py for map of variable name to index. 
+**sys\_weights** 19 floats: See `sys_weights_map` dictionary inside H5\_maker.py for map of variable name to index. 
     "nom_weight" is the nominal weight and all others are the weights for given systematic variation.
 WARNING: Careful with the overall normalizations, they are not accurate currently (including nom_weight)! (eg some weights may average to 1.3 instead of 1.0 )
         Best to work with relative normalizations/shape changes for now.
+        
         ```[nom_weight, pdf_up, pdf_down, prefire_up, prefire_down, pileup_up, pileup_down, btag_up, btag_down, 
         PS_ISR_up, PS_ISR_down, PS_FSR_up, PS_FSR_down, F_up, F_down, R_up, R_down, RF_up, RF_down] ```
 
-**jet1(2)\_JME\_vars**:  12 floats. See `JME\_weights\_map` dictionary inside H5_maker.py for map of variable name to index.
-The standard corrections are applied if the systematics turned on, this stores
+**jet1(2)\_JME\_vars**:  12 floats. See `JME_weights_map` dictionary inside H5_maker.py for map of variable name to index.
+The nominal corrections are applied if the systematics turned on, this stores
 variations.
-        ```[pt_JES_up m_JES_up pt_JES_down m_JES_down pt_JER_up m_JER_up pt_JER_down m_JER_down m_JMS_up m_JMS_down m_JMR_up m_JMR_down]```
+
+        ```[pt_JES_up, m_JES_up, pt_JES_down, m_JES_down, pt_JER_up, m_JER_up, pt_JER_down, m_JER_down, m_JMS_up, m_JMS_down, m_JMR_up, m_JMR_down]```
 
 
 
