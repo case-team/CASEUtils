@@ -69,6 +69,7 @@ class Fitter(object):
         getattr(self.w,'import')(dataHist,ROOT.RooFit.Rename(name))
 
     def fetch(self,var):
+        #import pdb; pdb.set_trace()
         self.w.var(var).Print()
         print("Fetching value " ,self.w.var(var).getVal()  )
         print("Fetching error " ,self.w.var(var).getError())
@@ -180,6 +181,19 @@ class Fitter(object):
         self.w.factory("Gaussian::gauss(%s,mean,gsigma)"%poi)
         self.w.factory("CBShape::cb(%s,mean,sigma,alpha,sign)"%poi)
         self.w.factory('SUM::'+name+'(sigfrac[0.0,0.0,0.850]*gauss,cb)')
+    
+    def signalDCB(self, name='model', poi="MVV", mass=0):
+    
+        ROOT.gSystem.Load("libHiggsAnalysisCombinedLimit")
+        
+        self.w.factory("MH[1000]")
+        self.w.factory("mean[%.1f,%.1f,%.1f]"%(mass,0.8*mass,1.2*mass))
+        self.w.factory("sigma[%.1f,%.1f,%.1f]"%(mass*0.05,mass*0.02,mass*0.10))
+        self.w.factory("alpha[1.2,0.0,18]")
+        self.w.factory("alpha2[1.2,0.0,10]")
+        self.w.factory("sign[5,0,600]")
+        self.w.factory("sign2[5,0,50]")
+        self.w.factory("DoubleCB::"+name+"(%s,mean,sigma,alpha,sign,alpha2,sign2)"%poi)
 
     def qcdShape(self,name = 'model',poi="MVV",nPars=2):
 
