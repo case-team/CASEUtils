@@ -337,13 +337,21 @@ def load_h5_sig(h_file, hist, sig_mjj, correctStats =False):
     event_num = None
     with h5py.File(h_file, "r") as f:
         try:
-            mjj = f['mjj'][()]
-        except:
             mjj = f['jet_kinematics'][:, 0]
+        except:
+            mjj = f['mjj'][()]
 
+        num_evts = mjj.shape[0]
         is_sig = f['truth_label'][()].flatten()
+
+
+        if(is_sig.shape[0] != mjj.shape[0]):
+            #fix bug in old h5 maker where is_sig array would be too long
+            is_sig = is_sig[:num_evts]
+        
         if(correctStats):
             event_num = f['event_num'][()]
+
 
     mask = (mjj > 0.8*sig_mjj) & (mjj < 1.2*sig_mjj) & (is_sig > 0.9)
     if(correctStats): event_num = event_num[mask]

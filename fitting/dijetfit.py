@@ -20,17 +20,20 @@ ROOT.RooRandom.randomGenerator().SetSeed(random.randint(0, 1e+6))
 
 
 def fit_signalmodel(input_file, sig_file_name, mass, x_bins, fine_bins,
-                    plot_dir, return_fit=False, dcb_model=False):
+                    plot_dir, return_fit=False, dcb_model=False, fit_range = 0.2):
     fine_bin_size = 4
     bins_fine = int(x_bins[-1]-x_bins[0])/fine_bin_size
+
+    mlow = (1.0 - fit_range) * mass
+    mhigh = (1.0 + fit_range) * mass
 
     bins_sig_fit = array(
         'f', truncate(
              [x_bins[0] + ib*fine_bin_size for ib in range(bins_fine + 1)],
-             0.8*mass, 1.2*mass)
+             mlow, mhigh)
         )
 
-    large_bins_sig_fit = array('f', truncate(x_bins, 0.8*mass, 1.2*mass))
+    large_bins_sig_fit = array('f', truncate(x_bins, mlow, mhigh))
     roobins_sig_fit = ROOT.RooBinning(len(large_bins_sig_fit) - 1,
                                       array('d', large_bins_sig_fit),
                                       "mjjbins_sig")

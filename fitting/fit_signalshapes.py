@@ -43,9 +43,10 @@ def fit_signals(options):
         print("########## FIT SIGNAL AND SAVE PARAMETERS ############")
         sig_file_name = os.path.join(out_dir, "sig_fit_{}.root".format(mass))
         current_fit = fit_signalmodel(options.inputFiles[i], sig_file_name,
-                                      mass, binsx, bins_fine, out_dir,
+                                      mass, binsx, bins_fine, out_dir + "/",
                                       return_fit=True,
-                                      dcb_model=options.dcbModel)
+                                      dcb_model=options.dcbModel, 
+                                      fit_range = options.fitRange)
 
         for var, graph in full_graphs.iteritems():
             val, err = current_fit.fetch(var)
@@ -74,6 +75,8 @@ def fitting_options():
     parser.add_argument("--dcbModel", dest="dcbModel", action="store_true",
                         default=False,
                         help="Whether or not to use double crystal ball model")
+    parser.add_argument("--fitRange", dest="fitRange", type = float, default=0.2,
+                        help="What mass range to perform fit to signal shape over (in terms of frac. of signal mass)")
     return parser
 
 
