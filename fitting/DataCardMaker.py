@@ -133,7 +133,7 @@ class DataCardMaker:
             self.w.var(p).setBins(bins)
             self.w.var(p).setBins(bins,"cache")
             mjj=self.w.var(p)
-        dataHist=ROOT.RooDataHist(name,name,cList,histogram)
+        dataHist = ROOT.RooDataHist(name, name, cList, histogram)
         #dataHist=ROOT.RooDataHist(name, name, ROOT.RooArgList(mjj), ROOT.RooFit.Import(histogram)) 
         getattr(self.w,'import')(dataHist,ROOT.RooFit.RenameVariable(name,name))
     
@@ -154,14 +154,97 @@ class DataCardMaker:
         pdfName="_".join([name,self.tag])
         pdfNorm="_".join([name,self.tag,"norm"])
         f=ROOT.TFile(filename)
-        histogram=f.Get(histoName)
-        events=histogram.Integral()
+        #histogram=f.Get(histoName)
+        #import pdb; pdb.set_trace()
+        #events=histogram.Integral()
+        events=100.0
         self.w.factory("{name}[{val},{mini},{maxi}]".format(name=pdfNorm,val=events,mini=mini,maxi=maxi))       
         if constant:
             self.w.var(pdfNorm).setConstant(1)
-        self.contributions.append({'name':name,'pdf':pdfName,'ID':ID,'yield':1.0})
+        self.contributions.append({'name':name,'pdf':pdfName,'ID':ID,'yield':events})
         return events
+
+    def addDCBSignalShape(self, name, variable, jsonFile, scale={},
+                          resolution={}):
+
+        pdfName="_".join([name,self.tag])
         
+        scaleStr='0'
+        resolutionStr='0'
+
+        scaleSysts=[]
+        resolutionSysts=[]
+        for syst,factor in scale.iteritems():
+            self.w.factory(syst+"[0,-0.1,0.1]")
+            scaleStr=scaleStr+"+{factor}*{syst}".format(factor=factor,syst=syst)
+            scaleSysts.append(syst)
+        for syst,factor in resolution.iteritems():
+            self.w.factory(syst+"[0,-0.5,0.5]")
+            resolutionStr=resolutionStr+"+{factor}*{syst}".format(factor=factor,syst=syst)
+            resolutionSysts.append(syst)
+            
+        self.w.factory(variable+"[0,13000]")
+    
+        f = ROOT.TFile(jsonFile,'READ')
+        meanG = f.Get('mean')
+        sigmaG = f.Get('sigma')
+        alpha_oneG = f.Get('alpha')
+        sign_oneG = f.Get('sign')
+        alpha_twoG = f.Get('alpha2')
+        sign_twoG = f.Get('sign2')
+
+        x = ROOT.Double(0.)
+        mean = ROOT.Double(0.)
+        meanG.GetPoint(0,x,mean)
+        sigma = ROOT.Double(0.)
+        sigmaG.GetPoint(0,x,sigma)
+        alpha_one = ROOT.Double(0.)
+        alpha_oneG.GetPoint(0, x, alpha_one)
+        alpha_two = ROOT.Double(0.)
+        alpha_twoG.GetPoint(0, x, alpha_two)
+        sign_one = ROOT.Double(0.)
+        sign_oneG.GetPoint(0,x,sign_one)
+        sign_two = ROOT.Double(0.)
+        sign_twoG.GetPoint(0,x,sign_two)
+
+        meanVar = "_".join(["MEAN", name, self.tag])
+        self.w.factory(
+            "expr::{name}('{param}*(1+{vv_syst})',{vv_systs},{param})".format(
+                name=meanVar, param=mean, vv_syst=scaleStr,
+                vv_systs=','.join(scaleSysts)))
+
+        sigmaVar = "_".join(["SIGMA", name, self.tag])
+        self.w.factory(
+            "expr::{name}('{param}*(1+{vv_syst})',{vv_systs},{param})".format(
+                name=sigmaVar, param=sigma, vv_syst=resolutionStr,
+                vv_systs=','.join(resolutionSysts)))
+
+        alphaOneVar = "_".join(["ALPHAONE", name, self.tag])        
+        alpha_one = ROOT.RooRealVar(alphaOneVar,alphaOneVar,alpha_one)
+        getattr(self.w, 'import')(alpha_one, ROOT.RooFit.Rename(alphaOneVar))
+
+        alphaTwoVar = "_".join(["ALPHATWO", name, self.tag])        
+        alpha_two = ROOT.RooRealVar(alphaTwoVar, alphaTwoVar, alpha_two)
+        getattr(self.w, 'import')(alpha_two, ROOT.RooFit.Rename(alphaTwoVar))
+        
+        signOneVar = "_".join(["SIGNONE", name, self.tag])
+        sign_one = ROOT.RooRealVar(signOneVar, signOneVar, sign_one)    
+        getattr(self.w, 'import')(sign_one, ROOT.RooFit.Rename(signOneVar))
+        
+        signTwoVar = "_".join(["SIGNTWO", name, self.tag])
+        sign_two = ROOT.RooRealVar(signTwoVar, signTwoVar, sign_two)    
+        getattr(self.w, 'import')(sign_two, ROOT.RooFit.Rename(signTwoVar))
+        
+        #dcbFunc = "_".join(["dcb", name, self.tag])
+        #import pdb; pdb.set_trace()
+        dcb = ROOT.RooDoubleCB(pdfName, pdfName, self.w.var(variable),
+                                      self.w.function(meanVar),
+                                      self.w.function(sigmaVar), alpha_one,
+                                      sign_one, alpha_two, sign_two)
+
+        getattr(self.w, 'import')(dcb, ROOT.RooFit.Rename(pdfName))
+
+
     def addSignalShape(self,name,variable,jsonFile,scale ={},resolution={}):
     
         pdfName="_".join([name,self.tag])
