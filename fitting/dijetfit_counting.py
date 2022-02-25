@@ -419,6 +419,8 @@ def fitting_options():
     parser.add_option("-i", "--inputFile", dest="inputFile", default='fit_inputs/no_selection_03p.h5', help="input h5 file")
     parser.add_option("-p", "--plotDir", dest="plotDir", default='plots/', help="Where to put the plots")
     parser.add_option("-b", "--blinded", dest="blinded", action="store_true", default=False, help="Blinding the signal region for the fit.")
+    parser.add_option("--sig_norm_unc", dest="sig_norm_unc", type=float, default= -1.0, help="Fractional uncertainty on signal normalization")
+    parser.add_option("--refit_sig", default= False, action="store_true", help="Fit the signal events (using truth labels) to get signal shape")
     #arser.add_option("-l","--label",dest="label",default='test',help="Label for file names")
     return parser
 

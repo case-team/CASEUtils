@@ -259,6 +259,9 @@ def dijetfit(options):
     card.addSystematic("model_qcd_mjj_JJ_norm","flatParam",[])
     
     card.importBinnedData( "sb_fit.root", sig_data_name,["mjj"],'data_obs',1.0)
+
+    if(options.sig_norm_unc > 0):
+        card.addSystematic("SigEff", "lnN", values = {"model_signal_mjj" : 1. + options.sig_norm_unc})
     card.makeCard()
     card.delete()
     
@@ -311,6 +314,7 @@ def dijetfit(options):
     results['signif'] = signif
     results['obs_lim_events'] = obs_limit*sig_norm
     results['exp_lim_events'] = exp_limit*sig_norm
+    results['sig_norm_unc'] = options.sig_norm_unc
 
     print("Saving fit results to %s" % plot_dir + "fit_results.pkl")
     with open(plot_dir + "fit_results.pkl", "w") as f:
@@ -329,6 +333,7 @@ def fitting_options():
     parser.add_option("-p","--plotDir",dest="plotDir",default='plots/',help="Where to put the plots")
     parser.add_option("-l","--label",dest="label",default='test',help="Label for file names")
     parser.add_option("-b", "--blinded", dest="blinded", action="store_true", default=False, help="Blinding the signal region for the fit.")
+    parser.add_option("--sig_norm_unc", dest="sig_norm_unc", type=float, default= -1.0, help="Fractional uncertainty on signal normalization")
     return parser
 
 if __name__ == "__main__":

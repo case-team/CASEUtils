@@ -72,7 +72,7 @@ def nPFCounter(index, event):
 def inHEMRegion(jet, year):
     if(year == 2018):
         return jet.eta > -3.2 and jet.eta < -1.3 and jet.phi  > -1.57 and jet.phi < -0.87
-    else: return True
+    else: return False
     
 
 
