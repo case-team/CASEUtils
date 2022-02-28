@@ -73,7 +73,13 @@ def inHEMRegion(jet, year):
     if(year == 2018):
         return jet.eta > -3.2 and jet.eta < -1.3 and jet.phi  > -1.57 and jet.phi < -0.87
     else: return False
-    
+
+def get_branch_mean(inTree, branch_name):
+
+    inTree.Draw(branch_name)
+    temp = ROOT.gPad.GetPrimitive("htemp")
+    return temp.GetMean()
+
 
 
 class Outputer:
@@ -129,6 +135,34 @@ class Outputer:
         pfcands = pfcands[sorted_idx]
         
         return pfcands.astype(np.float16)
+
+    def get_weight_avgs(self, inTree):
+        #avg across whole sample (before preselection), allows effect on preselection efficiency to be accounted for
+        ROOT.gROOT.SetBatch(True)
+
+        self.avg_weights = dict()
+
+        sys_branch_names = ["Pileup__nom", "Pileup__up", "Pileup__down", 
+                "lead_sjbtag_corr__nom",  "lead_sjbtag_corr__up",  "lead_sjbtag_corr__down",  "sublead_sjbtag_corr__nom",  "sublead_sjbtag_corr__up",  "sublead_sjbtag_corr__down",  
+                "Pdfweight__up", "Pdfweight__down", 
+                "PSWeight[0]",  "PSWeight[1]", "PSWeight[2]", "PSWeight[3]",
+                ]
+
+        #read number of scale variations
+        event = Event(inTree, 0)
+        nLHEScale = inTree.readBranch("nLHEScaleWeight")
+        for i in range(nLHEScale): sys_branch_names.append("LHEScaleWeight[%i]" % i)
+        if(self.year == 2016 or self.year == 2017):
+            sys_branch_names += ['Prefire__nom', 'Prefire__up', 'Prefire__down']
+
+        print("Avg. weights: ")
+        for sys_branch in sys_branch_names:
+            sys_mean = get_branch_mean(inTree, sys_branch)
+            print(sys_branch, sys_mean)
+            self.avg_weights[sys_branch] = sys_mean
+
+    def normed_weight(self, tree, branch):
+        return tree.readBranch(branch) / self.avg_weights[branch]
             
     
     def fill_event(self, inTree, event, jet1, jet2, jet3, PFCands, subjets, mjj):
@@ -161,26 +195,26 @@ class Outputer:
             #These branches are not in the regualr PFNano/Pancakes should have been added by TIMBER
 
             #PDF's
-            pdf_up = inTree.readBranch('Pdfweight__up')
-            pdf_down = inTree.readBranch('Pdfweight__down')
+            pdf_up = self.normed_weight(inTree, 'Pdfweight__up')
+            pdf_down = self.normed_weight(inTree, 'Pdfweight__down')
             
             #Prefire
             if(self.year == 2016 or self.year == 2017):
-                prefire_nom = inTree.readBranch('Prefire__nom')
-                prefire_up = inTree.readBranch('Prefire__up') / prefire_nom
-                prefire_down = inTree.readBranch('Prefire__down') / prefire_nom
+                prefire_nom = self.normed_weight(inTree, 'Prefire__nom')
+                prefire_up = self.normed_weight(inTree, 'Prefire__up') / prefire_nom
+                prefire_down = self.normed_weight(inTree, 'Prefire__down') / prefire_nom
             else:
                 prefire_nom = prefire_up = prefire_down = 1.0
 
             #Pileup
-            pileup_nom = inTree.readBranch('Pileup__nom')
-            pileup_up = inTree.readBranch('Pileup__up') / pileup_nom
-            pileup_down = inTree.readBranch('Pileup__down') / pileup_nom
+            pileup_nom = self.normed_weight(inTree, 'Pileup__nom')
+            pileup_up = self.normed_weight(inTree, 'Pileup__up') / pileup_nom
+            pileup_down = self.normed_weight(inTree, 'Pileup__down') / pileup_nom
 
             #btag TODO divide out average weight so normalization unchanged?
-            btag_nom =  inTree.readBranch('lead_sjbtag_corr__nom') * inTree.readBranch('sublead_sjbtag_corr__nom')
-            btag_up =  inTree.readBranch('lead_sjbtag_corr__up') * inTree.readBranch('sublead_sjbtag_corr__up') / btag_nom
-            btag_down =  inTree.readBranch('lead_sjbtag_corr__down') * inTree.readBranch('sublead_sjbtag_corr__down') / btag_nom
+            btag_nom =  self.normed_weight(inTree, 'lead_sjbtag_corr__nom') * self.normed_weight(inTree, 'sublead_sjbtag_corr__nom')
+            btag_up =  self.normed_weight(inTree, 'lead_sjbtag_corr__up') * self.normed_weight(inTree, 'sublead_sjbtag_corr__up') / btag_nom
+            btag_down =  self.normed_weight(inTree, 'lead_sjbtag_corr__down') * self.normed_weight(inTree, 'sublead_sjbtag_corr__down') / btag_nom
 
             #PS weights
             #Older samples don't have
@@ -189,49 +223,49 @@ class Outputer:
             if(nPS > 1):
                 #order https://cms-nanoaod-integration.web.cern.ch/integration/cms-swCMSSW_10_6_X/mc106Xul17_doc.html
                 PS_weights = inTree.readBranch("PSWeight")
-                PS_ISR_up = PS_weights[0]
-                PS_FSR_up = PS_weights[1]
-                PS_ISR_down = PS_weights[2]
-                PS_FSR_down = PS_weights[3]
+                PS_ISR_up = PS_weights[0] / self.avg_weights['PSWeight[0]']
+                PS_FSR_up = PS_weights[1] / self.avg_weights['PSWeight[1]']
+                PS_ISR_down = PS_weights[2] / self.avg_weights['PSWeight[2]']
+                PS_FSR_down = PS_weights[3] / self.avg_weights['PSWeight[3]']
+
 
             #Renorm / Fac weights
 
             nScale = inTree.readBranch("nLHEScaleWeight")
             RF_down = R_down = F_down = F_up = R_up = RF_up = 1.
-            if(nScale > 1):
+            if(nScale == 9):
                 #order https://cms-nanoaod-integration.web.cern.ch/integration/cms-swCMSSW_10_6_X/mc106Xul17_doc.html
                 scale_weights = inTree.readBranch("LHEScaleWeight")
                 
-                RF_down = scale_weights[0]
-                R_down = scale_weights[1]
-                F_down = scale_weights[3]
-                F_up = scale_weights[5]
-                R_up = scale_weights[7]
-                RF_up = scale_weights[8]
+                RF_down = scale_weights[0] / self.avg_weights['LHEScaleWeight[0]']
+                R_down = scale_weights[1] / self.avg_weights['LHEScaleWeight[1]']
+                F_down = scale_weights[3] / self.avg_weights['LHEScaleWeight[3]']
+                F_up = scale_weights[5] / self.avg_weights['LHEScaleWeight[5]']
+                R_up = scale_weights[7] / self.avg_weights['LHEScaleWeight[7]']
+                RF_up = scale_weights[8] / self.avg_weights['LHEScaleWeight[8]']
+            elif[nScale == 8]:
+                scale_weights = inTree.readBranch("LHEScaleWeight")
+                
+                RF_down = scale_weights[0] / self.avg_weights['LHEScaleWeight[0]']
+                R_down = scale_weights[1] / self.avg_weights['LHEScaleWeight[1]']
+                F_down = scale_weights[3] / self.avg_weights['LHEScaleWeight[3]']
+                F_up = scale_weights[4] / self.avg_weights['LHEScaleWeight[4]']
+                R_up = scale_weights[6] / self.avg_weights['LHEScaleWeight[6]']
+                RF_up = scale_weights[7] / self.avg_weights['LHEScaleWeight[7]']
+
+
 
 
             gen_weight = prefire_nom * pileup_nom * btag_nom
             sys_weights = [gen_weight, pdf_up, pdf_down, prefire_up, prefire_down, pileup_up, pileup_down, btag_up, btag_down, 
             PS_ISR_up, PS_ISR_down, PS_FSR_up, PS_FSR_down, F_up, F_down, R_up, R_down, RF_up, RF_down]
 
-            #print(prefire_nom, pileup_nom, btag_nom)
-            #print(len(sys_weights), sys_weights)
-
             test = event.lead_sjbtag_corr__vec
 
             #clip extreme variations
             self.sys_weights[self.idx] = np.clip(np.array(sys_weights, dtype=np.float32), 1e-3, 1e3)
-            #for key in sys_weights_map.keys():
-            #    print(key, self.sys_weights[self.idx, sys_weights_map[key]])
-
-            #print(jet1.msoftdrop, jet1.mass)
-
 
             #JME Corrections 
-            #TODO actually read the corrections...
-            #pt_nom = inTree.readBranch('FatJet_pt_corr')
-            #msd_nom = inTree.readBranch('FatJet_msoftdrop_corr')
-            #dijet_idxs = inTree.readBranch("DijetIdxs")
             dijet_idx1  = inTree.readBranch("DijetIdx1")
             dijet_idx2  = inTree.readBranch("DijetIdx2")
 
@@ -241,15 +275,6 @@ class Outputer:
                 print(jet1.msoftdrop, jet2.msoftdrop)
                 sys.exit(1)
 
-
-
-
-
-
-
-            #print(pt_nom)
-            #print(msd_nom)
-            #print(dijet_idxs)
 
             #nominal
             jet1.pt_corr = inTree.readBranch("FatJet1_pt_corr")
@@ -442,10 +467,45 @@ class Outputer:
             self.jet2_extraInfo = self.jet2_extraInfo[:self.idx]
             self.jet_kinematics = self.jet_kinematics[:self.idx] 
             self.event_info = self.event_info[:self.idx]
+            if(self.include_systematics):
+                self.sys_weights = self.sys_weights[:self.idx]
+                self.jet1_JME_vars = self.jet1_JME_vars[:self.idx]
+                self.jet2_JME_vars = self.jet2_JME_vars[:self.idx]
 
         self.write_out()
+        self.preselection_eff = eff
         with h5py.File(self.output_name, "a") as f:
             f.create_dataset("preselection_eff", data=np.array([eff]))
+
+    def add_d_eta_eff(self, d_eta_cut = 1.3):
+        with h5py.File(self.output_name, "a") as f:
+            d_eta = f['jet_kinematics'][:, 1]
+            d_eta_eff = np.mean(d_eta < d_eta_cut)
+            print("Delta eta cut (< %.2f) eff is %.3f " % (d_eta_cut, d_eta_eff))
+            f.create_dataset("d_eta_eff", data=np.array([d_eta_eff]))
+
+    def normalize_sys_weights(self):
+        if(self.include_systematics):
+            with h5py.File(self.output_name, "a") as f:
+                cur_weights = f['sys_weights'][:]
+                normed_weights = np.copy(cur_weights[:])
+                weight_avg = np.mean(cur_weights, axis = 0)
+                print(self.avg_weights)
+                print(weight_avg)
+
+                #renormalize so nominal weight avgs to 1, change preselection eff
+                nom_weight_avg = weight_avg[0]
+                f['preselection_eff'][0] *= nom_weight_avg
+                f['sys_weights'][:,0] /= nom_weight_avg
+
+                self.preselection_eff = f['preselection_eff'][0] 
+                
+
+                #for key,idx in sys_weights_dict.items():
+                
+        
+
+
 
 
 
@@ -532,6 +592,9 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
 
         out = Outputer(outputFileName, truth_label =  process_flag, sample_type=sampleType, sort_pfcands=sort_pfcands, include_systematics = include_systematics, year = year)
 
+        if(include_systematics):
+            out.get_weight_avgs(inTree)
+
 
         # Grab event tree from nanoAOD
         eventBranch = inTree.GetBranch('event')
@@ -544,6 +607,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
 
         entries = inTree.entries
         for entry in xrange(entries):
+
 
             if count % 10000 == 0 :
                 print('--------- Processing Event ' + str(count) +'   -- percent complete ' + str(100*count/nTotal/nFiles) + '% -- ')
@@ -559,14 +623,14 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             passFilter = True
             for fil in filters:
                 passFilter = passFilter and inTree.readBranch(fil)
-            if(not passFilter): continue
+            if(not passFilter): 
+                continue
             
-            # Apply triggers only to data, not MC!
-            if sampleType == "data":
-                for trig in triggers:
-                    passTrigger = passTrigger or inTree.readBranch(trig)
+            for trig in triggers:
+                passTrigger = passTrigger or inTree.readBranch(trig)
 
-                if(not passTrigger): continue
+            if(not passTrigger): 
+                continue
 
 
 
@@ -655,7 +719,9 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
 
     efficiency = float(saved)/count
     out.final_write_out(efficiency)
-    print("Done. Selected %i events. Selection efficiency is %.3f \n" % (saved, efficiency))
+    out.add_d_eta_eff()
+    out.normalize_sys_weights()
+    print("Done. Selected %i events. Selection efficiency is %.3f \n" % (saved, out.preselection_eff))
     print("Outputed to %s" % outputFileName)
     return saved
 

@@ -343,6 +343,7 @@ def dijetfit(options):
         card.addSignalShape('model_signal_mjj', 'mjj', sig_file_name,
                             {'CMS_scale_j': 1.0}, {'CMS_res_j': 1.0})
     constant = options.sig_norm
+
     sig_norm = card.addFixedYieldFromFile('model_signal_mjj', 0, sig_file_name,
                                           "mjj_sig", constant=constant)
     #sig_norm = card.addFloatingYield('model_signal_mjj', 0, sig_file_name,
@@ -357,10 +358,10 @@ def dijetfit(options):
 
     card.addSystematic("model_qcd_mjj_JJ_norm", "flatParam", [])
     card.importBinnedData("sb_fit.root", sig_data_name,
+                          ["mjj"], 'data_obs', 1.0)
 
     if(options.sig_norm_unc > 0):
         card.addSystematic("SigEff", "lnN", values = {"model_signal_mjj" : 1. + options.sig_norm_unc})
-                          ["mjj"], 'data_obs', 1.0)
     card.makeCard()
     card.delete()
 
