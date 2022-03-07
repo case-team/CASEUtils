@@ -480,7 +480,14 @@ class Outputer:
     def add_d_eta_eff(self, d_eta_cut = 1.3):
         with h5py.File(self.output_name, "a") as f:
             d_eta = f['jet_kinematics'][:, 1]
-            d_eta_eff = np.mean(d_eta < d_eta_cut)
+            d_eta_mask = d_eta < d_eta_cut
+            if(not self.include_systematics):
+                d_eta_eff = np.mean(d_eta_mask)
+            else:
+                weight_pass = np.sum(f['sys_weights'][:,0][d_eta_mask])
+                weight_tot = np.sum(f['sys_weights'][:,0])
+                d_eta_eff = weight_pass / weight_tot
+
             print("Delta eta cut (< %.2f) eff is %.3f " % (d_eta_cut, d_eta_eff))
             f.create_dataset("d_eta_eff", data=np.array([d_eta_eff]))
 
@@ -490,7 +497,6 @@ class Outputer:
                 cur_weights = f['sys_weights'][:]
                 normed_weights = np.copy(cur_weights[:])
                 weight_avg = np.mean(cur_weights, axis = 0)
-                print(self.avg_weights)
                 print(weight_avg)
 
                 #renormalize so nominal weight avgs to 1, change preselection eff
@@ -719,8 +725,8 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
 
     efficiency = float(saved)/count
     out.final_write_out(efficiency)
-    out.add_d_eta_eff()
     out.normalize_sys_weights()
+    out.add_d_eta_eff()
     print("Done. Selected %i events. Selection efficiency is %.3f \n" % (saved, out.preselection_eff))
     print("Outputed to %s" % outputFileName)
     return saved
