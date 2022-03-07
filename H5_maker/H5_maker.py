@@ -31,9 +31,13 @@ def nPFCounter(index, event):
     
     return count
 
+def inHEMRegion(jet, year):
+    if(year == 2018):
+        return jet.eta > -3.2 and jet.eta < -1.3 and jet.phi  > -1.57 and jet.phi < -0.87
+    else: return False
 
 class Outputer:
-    def __init__(self, outputFileName="out.root", batch_size = 5000, truth_label = 0, sample_type="MC", sort_pfcands=False):
+    def __init__(self, outputFileName="out.root", batch_size = 5000, truth_label = 0, sample_type="MC", sort_pfcands=True, year = -1):
         self.batch_size = batch_size
         self.output_name = outputFileName
         self.sample_type = sample_type
@@ -43,6 +47,7 @@ class Outputer:
         self.nBatch = 0
         self.n_pf_cands = 100 #how many PF candidates to save (max)
         self.sort_pfcands = sort_pfcands
+        self.year = year
         self.reset()
 
     def reset(self):
@@ -52,7 +57,7 @@ class Outputer:
         self.jet1_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
         self.jet2_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
         self.jet_kinematics = np.zeros((self.batch_size, 14), dtype=np.float32)
-        self.event_info = np.zeros((self.batch_size, 6), dtype=np.float32)
+        self.event_info = np.zeros((self.batch_size, 7), dtype=np.float32)
 
 
     def is_leptonic_decay(self, event):
@@ -67,7 +72,7 @@ class Outputer:
             m = genPart.genPartIdxMother
             if(m < 0 or abs(m) > nGenParts):
                 continue
-            elif abs(genPart.pdgId) > 11 and abs(genPart.pdgId) < 18 and GenPartsColl[m].mass > 20: 
+            elif abs(genPart.pdgId) >= 11 and abs(genPart.pdgId) < 18 and GenPartsColl[m].mass > 20: 
                 return True
 
         return False
@@ -96,7 +101,7 @@ class Outputer:
         eventNum = inTree.readBranch('event')
         run = inTree.readBranch('run')
 
-        event_info = [eventNum, MET, MET_phi, genWeight, leptonic_decay, run]
+        event_info = [eventNum, MET, MET_phi, genWeight, leptonic_decay, run, self.year]
 
         d_eta = abs(jet1.eta - jet2.eta)
 
@@ -108,26 +113,26 @@ class Outputer:
         else:
             jet_kinematics.extend([0., 0., 0., 0.])
 
-        j1_nPF = min(self.n_pf_cands, jet1.nPFConstituents)
-        j2_nPF = min(self.n_pf_cands, jet2.nPFConstituents)
         
         #maximum deepcsv from top 2 subjets of the fatjet
         jet1_btag = jet2_btag = -1.
         
-        if(jet1.subJetIdx1 > 0):
+        if(jet1.subJetIdx1 >= 0):
             jet1_btag = subjets[jet1.subJetIdx1].btagDeepB
-        if(jet1.subJetIdx2 > 0):
+        if(jet1.subJetIdx2 >= 0):
             jet1_btag = max(jet1_btag, subjets[jet1.subJetIdx2].btagDeepB)
 
-        if(jet2.subJetIdx1 > 0):
+        if(jet2.subJetIdx1 >= 0):
             jet2_btag = subjets[jet2.subJetIdx1].btagDeepB
-        if(jet2.subJetIdx2 > 0):
+        if(jet2.subJetIdx2 >= 0):
             jet2_btag = max(jet2_btag, subjets[jet2.subJetIdx2].btagDeepB)
 
-        jet1_extraInfo = [jet1.tau1, jet1.tau2, jet1.tau3, jet1.tau4, jet1.lsf3, jet1_btag, j1_nPF]
-        jet2_extraInfo = [jet2.tau1, jet2.tau2, jet2.tau3, jet2.tau4, jet2.lsf3, jet2_btag, j2_nPF]
+        jet1_extraInfo = [jet1.tau1, jet1.tau2, jet1.tau3, jet1.tau4, jet1.lsf3, jet1_btag, jet1.nPFConstituents]
+        jet2_extraInfo = [jet2.tau1, jet2.tau2, jet2.tau3, jet2.tau4, jet2.lsf3, jet2_btag, jet2.nPFConstituents]
         #print(jet1.PFConstituents_Start, jet1.PFConstituents_Start + jet1.nPFConstituents, jet2.PFConstituents_Start, jet2.PFConstituents_Start + jet2.nPFConstituents)
 
+        j1_nPF = min(self.n_pf_cands, jet1.nPFConstituents)
+        j2_nPF = min(self.n_pf_cands, jet2.nPFConstituents)
         range1 = range(jet1.PFConstituents_Start, jet1.PFConstituents_Start + j1_nPF, 1)
         range2 = range(jet2.PFConstituents_Start, jet2.PFConstituents_Start + j2_nPF, 1)
         jet1_PFCands = []
@@ -204,23 +209,24 @@ class Outputer:
             f.create_dataset("preselection_eff", data=np.array([eff]))
 
 
-def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.root", json = '', year = 2016, nEventsMax = -1, sampleType = "MC", sort_pfcands=False):
+def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.root", json = '', year = 2016, nEventsMax = -1, sampleType = "MC", sort_pfcands=True):
     
     if not ((sampleType == "MC") or (sampleType=="data")):
         print("Error! sampleType needs to be set to either data or MC! Please set correct option and retry.")
         sys.exit()
     
-    #Just tried to copy common filters, feel free to add any i am missing
+    #Applying standard MET filters: https://twiki.cern.ch/twiki/bin/view/CMS/MissingETOptionalFiltersRun2#Analysis_Recommendations_for_ana
     filters = ["Flag_goodVertices",
-    "Flag_globalTightHalo2016Filter",
-    "Flag_eeBadScFilter", 
+    "Flag_globalSuperTightHalo2016Filter",
     "Flag_HBHENoiseFilter",
     "Flag_HBHENoiseIsoFilter",
-    "Flag_ecalBadCalibFilter",
     "Flag_EcalDeadCellTriggerPrimitiveFilter",
-    "Flag_BadChargedCandidateFilter",
+    "Flag_BadPFMuonFilter",
+    "Flag_BadPFMuonDzFilter",
+    "Flag_eeBadScFilter", 
     ]
     if((year == 2016) or (year == 2016.5)): filters.append("Flag_CSCTightHaloFilter")
+    if(year == 2017 or year == 2018): filters.append("Flag_ecalBadCalibFilter")
 
     if(year == 2016):
         triggers = ["HLT_PFHT800", "HLT_PFJet450"]
@@ -281,7 +287,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             inTree= InputTree(inTree) 
             print('Running over %i entries \n' % nTotal)
 
-        out = Outputer(outputFileName, truth_label =  process_flag, sample_type=sampleType, sort_pfcands=sort_pfcands)
+        out = Outputer(outputFileName, truth_label =  process_flag, sample_type=sampleType, sort_pfcands=sort_pfcands, year = year)
 
 
         # Grab event tree from nanoAOD
@@ -312,12 +318,11 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
                 passFilter = passFilter and inTree.readBranch(fil)
             if(not passFilter): continue
             
-            # Apply triggers only to data, not MC!
-            if sampleType == "data":
-                for trig in triggers:
-                    passTrigger = passTrigger or inTree.readBranch(trig)
+            # Apply triggers only to data and MC
+            for trig in triggers:
+                passTrigger = passTrigger or inTree.readBranch(trig)
 
-                if(not passTrigger): continue
+            if(not passTrigger): continue
 
 
 
@@ -372,6 +377,9 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             
 
             if(jet1 == None or jet2 == None): continue
+
+
+            if(inHEMRegion(jet1, year) or inHEMRegion(jet2, year)): continue
 
             #Order jets so jet1 is always the higher mass one
             if(jet1.msoftdrop < jet2.msoftdrop):
