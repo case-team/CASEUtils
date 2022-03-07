@@ -57,7 +57,7 @@ class Outputer:
         self.jet1_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
         self.jet2_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
         self.jet_kinematics = np.zeros((self.batch_size, 14), dtype=np.float32)
-        self.event_info = np.zeros((self.batch_size, 7), dtype=np.float32)
+        self.event_info = np.zeros((self.batch_size, 8), dtype=np.float32)
 
 
     def is_leptonic_decay(self, event):
@@ -87,7 +87,7 @@ class Outputer:
         return pfcands.astype(np.float16)
             
     
-    def fill_event(self, inTree, event, jet1, jet2, jet3, PFCands, subjets, mjj):
+    def fill_event(self, inTree, event, jet1, jet2, jet3, PFCands, subjets, mjj, num_jets):
 
         if self.sample_type == "data":
             genWeight = 1
@@ -101,7 +101,7 @@ class Outputer:
         eventNum = inTree.readBranch('event')
         run = inTree.readBranch('run')
 
-        event_info = [eventNum, MET, MET_phi, genWeight, leptonic_decay, run, self.year]
+        event_info = [eventNum, MET, MET_phi, genWeight, leptonic_decay, run, self.year, num_jets]
 
         d_eta = abs(jet1.eta - jet2.eta)
 
@@ -349,16 +349,18 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
         
             pf_conts_start = 0 #keep track of indices for PF candidates
             jet_index = 0
+            num_jets = 0
             for jet in AK8Jets:
                 #jetId : bit1 = loose, bit2 = tight, bit3 = tightLepVeto
                 #want tight id
-                if((jet.jetId & 2 == 2) and jet.pt > jet_min_pt and abs(jet.eta) < 2.5):
+                if((jet.jetId & 2 == 2) and abs(jet.eta) < 2.5):
                     jet.PFConstituents_Start = pf_conts_start
-                    if(jet1 == None or jet.pt > jet1.pt):
+                    if(jet.pt > 50): num_jets+=1
+                    if((jet1 == None or jet.pt > jet1.pt) and jet.pt > jet_min_pt):
                         jet3 = jet2
                         jet2 = jet1
                         jet1 = jet
-                    elif(jet2 == None or jet.pt > jet2.pt):
+                    elif((jet2 == None or jet.pt > jet2.pt) and jet.pt > jet_min_pt):
                         jet3 = jet2
                         jet2 = jet
                     elif(jet3 == None or jet.pt > jet3.pt):
@@ -397,7 +399,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
         
 
             saved+=1
-            out.fill_event(inTree, event, jet1, jet2, jet3, PFCands, subjets, mjj)
+            out.fill_event(inTree, event, jet1, jet2, jet3, PFCands, subjets, mjj, num_jets)
             if(nEventsMax > 0 and saved >= nEventsMax): break
 # -------- End Loop over tree-------------------------------------
 # -------- End Loop over files-------------------------------------

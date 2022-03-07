@@ -9,7 +9,9 @@ The preselection is as follows
 Filters: 
 
 ```
-Flag\_goodVertices, Flag\_globalTightHalo2016Filter, Flag\_eeBadScFilter, Flag\_HBHENoiseFilter, Flag\_HBHENoiseIsoFilter, Flag\_ecalBadCalibFilter, Flag\_EcalDeadCellTriggerPrimitiveFilter, Flag\_BadChargedCandidateFilter
+Flag\_goodVertices Flag\_globalSuperTightHalo2016Filter, Flag\_HBHENoiseFilter, Flag\_HBHENoiseIsoFilter, Flag\_EcalDeadCellTriggerPrimitiveFilter, 
+Flag\_BadPFMuonFilter, Flag\_BadPFMuonDzFilter, Flag\_eeBadScFilter, Flag\_CSCTightHaloFilter (2016 only), Flag\_ecalBadCalibFilter (2017/8 only)
+
 ```
 
 Triggers:
@@ -20,7 +22,7 @@ Triggers:
 
 Mjj > 1200.
 
-2 AK8 Jets with tight ID,  pt > 200 , |eta| < 2.5
+2 AK8 Jets with tight ID,  pt > 300 , |eta| < 2.5
 
 
 ## Output
@@ -37,9 +39,10 @@ The data in each keys are:
 
 **truth\_label** :  single int. Labels  the type of event. 0 is QCD, signals are => 1 (depends on dataset), other backgrounds are TBD but will be < 0
 
-**event\_info** : 7 floats. [eventNum, MET, MET\_phi, genWeight, leptonic\_decay, runNum, year]
+**event\_info** : 8 floats. [eventNum, MET, MET\_phi, genWeight, leptonic\_decay, runNum, year, nJets]
 leptonic decay is a flag that will check the generator level
 decay to see if it is leptonic / semi-leptonic or not (1 for leptonic, 0 for full hadronic)
+nJets is the number of Ak8 jets with pt > 50, |eta| < 2.5 and passing tight ID
 
 **jet\_kinematics** :  14 floats. Mjj, delta\_eta (between j1 and j2), followed by the 4 vectors of j1, j2 and j3  in pt,eta,phi,m\_softdrop format (if no 3rd jet passing cuts, zeros)
 
