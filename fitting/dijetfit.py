@@ -156,7 +156,12 @@ def dijetfit(options):
                         dcb_model=options.dcb_model)
 
     else:  # use precomputed signal shape
+        if(not os.path.exists(options.sig_shape)):
+            print("Sig file %s doesn't exist" % options.sig_shape)
+            exit(1)
         sig_file_name = options.sig_shape
+
+
 
     print("\n\n ############# FIT BACKGROUND AND SAVE PARAMETERS ###########")
     nParsToTry = [2, 3, 4]
