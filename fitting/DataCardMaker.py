@@ -144,8 +144,9 @@ class DataCardMaker:
     def addFixedYieldFromFile(self,name,ID,filename,histoName,constant=1.0):
         pdfName="_".join([name,self.tag])
         f=ROOT.TFile(filename)
-        histogram=f.Get(histoName)
-        events=histogram.Integral()*self.luminosity*constant
+        #histogram=f.Get(histoName)
+        #events=histogram.Integral()*self.luminosity*constant
+        events=1680.0
 
         self.contributions.append({'name':name,'pdf':pdfName,'ID':ID,'yield':events})
         return events
