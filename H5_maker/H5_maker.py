@@ -83,7 +83,8 @@ def get_branch_mean(inTree, branch_name):
 
 
 class Outputer:
-    def __init__(self, outputFileName="out.root", batch_size = 5000, truth_label = 0, sample_type="MC", sort_pfcands = False, include_systematics = False, year = 2017):
+    def __init__(self, outputFileName="out.root", batch_size = 5000, truth_label = 0, sample_type="MC", sort_pfcands = False, include_systematics = True, year = 2017):
+
         self.batch_size = batch_size
         self.output_name = outputFileName
         self.sample_type = sample_type
@@ -104,7 +105,7 @@ class Outputer:
         self.jet1_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
         self.jet2_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
         self.jet_kinematics = np.zeros((self.batch_size, 14), dtype=np.float32)
-        self.event_info = np.zeros((self.batch_size, 6), dtype=np.float32)
+        self.event_info = np.zeros((self.batch_size, 8), dtype=np.float32)
         self.sys_weights = np.zeros((self.batch_size, 19), dtype=np.float32)
         self.jet1_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
         self.jet2_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
@@ -122,7 +123,7 @@ class Outputer:
             m = genPart.genPartIdxMother
             if(m < 0 or abs(m) > nGenParts):
                 continue
-            elif abs(genPart.pdgId) > 11 and abs(genPart.pdgId) < 18 and GenPartsColl[m].mass > 20: 
+            elif abs(genPart.pdgId) >= 11 and abs(genPart.pdgId) < 18 and GenPartsColl[m].mass > 20: 
                 return True
 
         return False
@@ -165,7 +166,7 @@ class Outputer:
         return tree.readBranch(branch) / self.avg_weights[branch]
             
     
-    def fill_event(self, inTree, event, jet1, jet2, jet3, PFCands, subjets, mjj):
+    def fill_event(self, inTree, event, jet1, jet2, jet3, PFCands, subjets, mjj, num_jets):
 
         if self.sample_type == "data":
             genWeight = 1
@@ -179,7 +180,7 @@ class Outputer:
         eventNum = inTree.readBranch('event')
         run = inTree.readBranch('run')
 
-        event_info = [eventNum, MET, MET_phi, genWeight, leptonic_decay, run]
+        event_info = [eventNum, MET, MET_phi, genWeight, leptonic_decay, run, self.year, num_jets]
 
         jet1.pt_corr = jet1.pt
         jet2.pt_corr = jet2.pt
@@ -266,6 +267,9 @@ class Outputer:
             #clip extreme variations
             self.sys_weights[self.idx] = np.clip(np.array(sys_weights, dtype=np.float32), 1e-3, 1e3)
 
+            self.jet1_JME_vars[self.idx] = jet1.JME_vars
+            self.jet2_JME_vars[self.idx] = jet2.JME_vars
+
 
             
 
@@ -286,28 +290,29 @@ class Outputer:
         else:
             jet_kinematics.extend([0., 0., 0., 0.])
 
-        jet1_nPF = min(self.n_pf_cands, jet1.nPFConstituents)
-        jet2_nPF = min(self.n_pf_cands, jet2.nPFConstituents)
         
         #maximum deepcsv from top 2 subjets of the fatjet
         jet1_btag = jet2_btag = -1.
         
-        if(jet1.subJetIdx1 > 0):
+        if(jet1.subJetIdx1 >= 0):
             jet1_btag = subjets[jet1.subJetIdx1].btagDeepB
-        if(jet1.subJetIdx2 > 0):
+        if(jet1.subJetIdx2 >= 0):
             jet1_btag = max(jet1_btag, subjets[jet1.subJetIdx2].btagDeepB)
 
-        if(jet2.subJetIdx1 > 0):
+        if(jet2.subJetIdx1 >= 0):
             jet2_btag = subjets[jet2.subJetIdx1].btagDeepB
-        if(jet2.subJetIdx2 > 0):
+        if(jet2.subJetIdx2 >= 0):
             jet2_btag = max(jet2_btag, subjets[jet2.subJetIdx2].btagDeepB)
 
-        jet1_extraInfo = [jet1.tau1, jet1.tau2, jet1.tau3, jet1.tau4, jet1.lsf3, jet1_btag, jet1_nPF]
-        jet2_extraInfo = [jet2.tau1, jet2.tau2, jet2.tau3, jet2.tau4, jet2.lsf3, jet2_btag, jet2_nPF]
+        jet1_extraInfo = [jet1.tau1, jet1.tau2, jet1.tau3, jet1.tau4, jet1.lsf3, jet1_btag, jet1.nPFConstituents]
+        jet2_extraInfo = [jet2.tau1, jet2.tau2, jet2.tau3, jet2.tau4, jet2.lsf3, jet2_btag, jet2.nPFConstituents]
         #print(jet1.PFConstituents_Start, jet1.PFConstituents_Start + jet1.nPFConstituents, jet2.PFConstituents_Start, jet2.PFConstituents_Start + jet2.nPFConstituents)
 
-        range1 = range(jet1.PFConstituents_Start, jet1.PFConstituents_Start + jet1_nPF, 1)
-        range2 = range(jet2.PFConstituents_Start, jet2.PFConstituents_Start + jet2_nPF, 1)
+        j1_nPF = min(self.n_pf_cands, jet1.nPFConstituents)
+        j2_nPF = min(self.n_pf_cands, jet2.nPFConstituents)
+        range1 = range(jet1.PFConstituents_Start, jet1.PFConstituents_Start + j1_nPF, 1)
+        range2 = range(jet2.PFConstituents_Start, jet2.PFConstituents_Start + j2_nPF, 1)
+
         jet1_PFCands = []
         jet2_PFCands = []
         for idx in range1:
@@ -375,7 +380,7 @@ class Outputer:
 
         self.reset()
 
-    def final_write_out(self, eff):
+    def final_write_out(self, eff, eff_JES_up = -1., eff_JES_down = -1., eff_JER_up = -1., eff_JER_down = -1.):
         if(self.idx < self.batch_size):
             print("Last batch only filled %i events, shortening arrays \n" % self.idx)
             self.jet1_PFCands = self.jet1_PFCands[:self.idx]
@@ -393,6 +398,11 @@ class Outputer:
         self.preselection_eff = eff
         with h5py.File(self.output_name, "a") as f:
             f.create_dataset("preselection_eff", data=np.array([eff]))
+            if(self.include_systematics):
+                f.create_dataset("preselection_eff_JES_up", data=np.array([eff_JES_up]))
+                f.create_dataset("preselection_eff_JES_down", data=np.array([eff_JES_down]))
+                f.create_dataset("preselection_eff_JER_up", data=np.array([eff_JER_up]))
+                f.create_dataset("preselection_eff_JER_down", data=np.array([eff_JER_down]))
 
     def add_d_eta_eff(self, d_eta_cut = 1.3):
         with h5py.File(self.output_name, "a") as f:
@@ -424,6 +434,12 @@ class Outputer:
                 self.preselection_eff = f['preselection_eff'][0] 
                 
 
+                f['preselection_eff_JES_up'][0] *= nom_weight_avg
+                f['preselection_eff_JES_down'][0] *= nom_weight_avg
+                f['preselection_eff_JER_up'][0] *= nom_weight_avg
+                f['preselection_eff_JER_down'][0] *= nom_weight_avg
+
+
                 #for key,idx in sys_weights_dict.items():
                 
         
@@ -441,17 +457,18 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
         print("Error! sampleType needs to be set to either data or MC! Please set correct option and retry.")
         sys.exit()
     
-    #Just tried to copy common filters, feel free to add any i am missing
+    #Applying standard MET filters: https://twiki.cern.ch/twiki/bin/view/CMS/MissingETOptionalFiltersRun2#Analysis_Recommendations_for_ana
     filters = ["Flag_goodVertices",
-    "Flag_globalTightHalo2016Filter",
-    "Flag_eeBadScFilter", 
+    "Flag_globalSuperTightHalo2016Filter",
     "Flag_HBHENoiseFilter",
     "Flag_HBHENoiseIsoFilter",
-    "Flag_ecalBadCalibFilter",
     "Flag_EcalDeadCellTriggerPrimitiveFilter",
-    "Flag_BadChargedCandidateFilter",
+    "Flag_BadPFMuonFilter",
+    "Flag_BadPFMuonDzFilter",
+    "Flag_eeBadScFilter", 
     ]
     if((year == 2016) or (year == 2016.5)): filters.append("Flag_CSCTightHaloFilter")
+    if(year == 2017 or year == 2018): filters.append("Flag_ecalBadCalibFilter")
 
     if(year == 2016):
         triggers = ["HLT_PFHT800", "HLT_PFJet450"]
@@ -481,6 +498,8 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
     print("Will run over %i files and output to %s with truth label %i" % (nFiles, outputFileName, process_flag))
     count = 0
     saved = 0
+
+    n_JES_up = n_JES_down = n_JER_up = n_JER_down = 0
 
 
 #----------------- Begin loop over files ---------------------------------
@@ -549,11 +568,11 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             if(not passFilter): 
                 continue
             
+            # Apply triggers only to data and MC
             for trig in triggers:
                 passTrigger = passTrigger or inTree.readBranch(trig)
 
-            if(not passTrigger): 
-                continue
+            if(not passTrigger): continue
 
 
 
@@ -583,17 +602,21 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
         
             pf_conts_start = 0 #keep track of indices for PF candidates
             jet_index = 0
+            num_jets = 0
+
             for i,jet in enumerate(AK8Jets):
                 jet.idx = i
                 #jetId : bit1 = loose, bit2 = tight, bit3 = tightLepVeto
                 #want tight id
-                if((jet.jetId & 2 == 2) and jet.pt > jet_min_pt and abs(jet.eta) < 2.5):
+                #select highest two pt jets, keep track of 3rd
+                if((jet.jetId & 2 == 2) and abs(jet.eta) < 2.5):
                     jet.PFConstituents_Start = pf_conts_start
-                    if(jet1 == None or jet.pt > jet1.pt):
+                    if(jet.pt > 50): num_jets+=1
+                    if((jet1 == None or jet.pt > jet1.pt and jet.pt > 50.)):
                         jet3 = jet2
                         jet2 = jet1
                         jet1 = jet
-                    elif(jet2 == None or jet.pt > jet2.pt):
+                    elif((jet2 == None or jet.pt > jet2.pt and jet.pt > 50.)):
                         jet3 = jet2
                         jet2 = jet
                     elif(jet3 == None or jet.pt > jet3.pt):
@@ -612,105 +635,13 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             
 
             if(jet1 == None or jet2 == None): continue
-
             if(inHEMRegion(jet1, year) or inHEMRegion(jet2, year)): continue
-
-
-            #JME Corrections 
-            dijet_idx1  = inTree.readBranch("DijetIdx1")
-            dijet_idx2  = inTree.readBranch("DijetIdx2")
-
-            if(dijet_idx1 != jet1.idx or dijet_idx2 != jet2.idx):
-                print("Dijet indices from TIMBER and this selector don't match!")
-                print("TIMBER : %i %i. This : %i %i " %(dijet_idx1, dijet_idx2, jet1.idx, jet2.idx))
-                print(jet1.msoftdrop, jet2.msoftdrop)
-                sys.exit(1)
-
-
-            #nominal
-            jet1.pt_corr = inTree.readBranch("FatJet1_pt_corr")
-            jet2.pt_corr = inTree.readBranch("FatJet2_pt_corr")
-
-            jet1.msoftdrop_corr = inTree.readBranch("FatJet1_msoftdrop_corr")
-            jet2.msoftdrop_corr = inTree.readBranch("FatJet2_msoftdrop_corr")
-
-
-            #systematics
-            jet1_pt_JES_up = inTree.readBranch("FatJet1_pt_JES_up")
-            jet2_pt_JES_up = inTree.readBranch("FatJet2_pt_JES_up")
-            jet1_msoftdrop_JES_up = inTree.readBranch("FatJet1_msoftdrop_JES_up")
-            jet2_msoftdrop_JES_up = inTree.readBranch("FatJet2_msoftdrop_JES_up")
-
-            jet1_pt_JES_down = inTree.readBranch("FatJet1_pt_JES_down")
-            jet2_pt_JES_down = inTree.readBranch("FatJet2_pt_JES_down")
-            jet1_msoftdrop_JES_down = inTree.readBranch("FatJet1_msoftdrop_JES_down")
-            jet2_msoftdrop_JES_down = inTree.readBranch("FatJet2_msoftdrop_JES_down")
-
-            jet1_pt_JER_up = inTree.readBranch("FatJet1_pt_JER_up")
-            jet2_pt_JER_up = inTree.readBranch("FatJet2_pt_JER_up")
-            jet1_msoftdrop_JER_up = inTree.readBranch("FatJet1_msoftdrop_JER_up")
-            jet2_msoftdrop_JER_up = inTree.readBranch("FatJet2_msoftdrop_JER_up")
-
-            jet1_pt_JER_down = inTree.readBranch("FatJet1_pt_JER_down")
-            jet2_pt_JER_down = inTree.readBranch("FatJet2_pt_JER_down")
-            jet1_msoftdrop_JER_down = inTree.readBranch("FatJet1_msoftdrop_JER_down")
-            jet2_msoftdrop_JER_down = inTree.readBranch("FatJet2_msoftdrop_JER_down")
-
-            jet1_msoftdrop_JMS_up = inTree.readBranch("FatJet1_msoftdrop_JMS_up")
-            jet2_msoftdrop_JMS_up = inTree.readBranch("FatJet2_msoftdrop_JMS_up")
-
-            jet1_msoftdrop_JMS_down = inTree.readBranch("FatJet1_msoftdrop_JMS_down")
-            jet2_msoftdrop_JMS_down = inTree.readBranch("FatJet2_msoftdrop_JMS_down")
-
-            jet1_msoftdrop_JMR_up = inTree.readBranch("FatJet1_msoftdrop_JMR_up")
-            jet2_msoftdrop_JMR_up = inTree.readBranch("FatJet2_msoftdrop_JMR_up")
-
-            jet1_msoftdrop_JMR_down = inTree.readBranch("FatJet1_msoftdrop_JMR_down")
-            jet2_msoftdrop_JMR_down = inTree.readBranch("FatJet2_msoftdrop_JMR_down")
-
-
-
-            jet1.JME_vars = [jet1_pt_JES_up, jet1_msoftdrop_JES_up, jet1_pt_JES_down, jet1_msoftdrop_JES_down, 
-                           jet1_pt_JER_up, jet1_msoftdrop_JER_up, jet1_pt_JER_down, jet1_msoftdrop_JER_down,
-                           jet1_msoftdrop_JMS_up, jet1_msoftdrop_JMS_down, jet1_msoftdrop_JMR_up, jet1_msoftdrop_JMR_down]
-
-            jet2.JME_vars = [jet2_pt_JES_up, jet2_msoftdrop_JES_up, jet2_pt_JES_down, jet2_msoftdrop_JES_down, 
-                           jet2_pt_JER_up, jet2_msoftdrop_JER_up, jet2_pt_JER_down, jet2_msoftdrop_JER_down,
-                           jet2_msoftdrop_JMS_up, jet2_msoftdrop_JMS_down, jet2_msoftdrop_JMR_up, jet2_msoftdrop_JMR_down]
-
-            if(jet2.msoftdrop_corr > jet1.msoftdrop_corr):
-                #if corrected mass of jet2 is now larger than jet1, swap
-                temp = jet1
-                jet1 = jet2
-                jet2 = temp
-
-
-
-            self.jet1_JME_vars[self.idx] = jet1.JME_vars
-            self.jet2_JME_vars[self.idx] = jet2.JME_vars
-
-
-            #recompute mjj for nominal case
-            jet1_4vec = ROOT.Math.PtEtaPhiMVector(jet1.pt_corr, jet1.eta, jet1.phi, jet1.msoftdrop_corr)
-            jet2_4vec = ROOT.Math.PtEtaPhiMVector(jet2.pt_corr, jet2.eta, jet2.phi, jet2.msoftdrop_corr)
-
-            #print(jet1.msoftdrop, jet1.msoftdrop_corr, jet2.msoftdrop, jet2.msoftdrop_corr)
-
-
-
-            dijet = jet1_4vec + jet2_4vec
-            mjj = dijet.M()
-
-
-
 
             #Order jets so jet1 is always the higher mass one
             if(jet1.msoftdrop < jet2.msoftdrop):
                 temp = jet1
                 jet1 = jet2
                 jet2 = temp
-
-
 
 
             jet1_4vec = ROOT.Math.PtEtaPhiMVector(jet1.pt, jet1.eta, jet1.phi, jet1.msoftdrop)
@@ -720,20 +651,148 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             dijet = jet1_4vec + jet2_4vec
             mjj = dijet.M()
 
-            if(mjj< mjj_cut): continue
+
+
+            if(include_systematics):
+                #JME Corrections 
+                dijet_idx1  = inTree.readBranch("DijetIdx1")
+                dijet_idx2  = inTree.readBranch("DijetIdx2")
+
+                if(dijet_idx1 != jet1.idx or dijet_idx2 != jet2.idx):
+                    print("Dijet indices from TIMBER and this selector don't match!")
+                    print("TIMBER : %i %i. This : %i %i " %(dijet_idx1, dijet_idx2, jet1.idx, jet2.idx))
+                    print(jet1.msoftdrop, jet2.msoftdrop)
+                    sys.exit(1)
+
+
+                #nominal
+                jet1.pt_corr = inTree.readBranch("FatJet1_pt_corr")
+                jet2.pt_corr = inTree.readBranch("FatJet2_pt_corr")
+
+                jet1.msoftdrop_corr = inTree.readBranch("FatJet1_msoftdrop_corr")
+                jet2.msoftdrop_corr = inTree.readBranch("FatJet2_msoftdrop_corr")
+
+
+                #systematics
+                jet1_pt_JES_up = inTree.readBranch("FatJet1_pt_JES_up")
+                jet2_pt_JES_up = inTree.readBranch("FatJet2_pt_JES_up")
+                jet1_msoftdrop_JES_up = inTree.readBranch("FatJet1_msoftdrop_JES_up")
+                jet2_msoftdrop_JES_up = inTree.readBranch("FatJet2_msoftdrop_JES_up")
+
+                jet1_pt_JES_down = inTree.readBranch("FatJet1_pt_JES_down")
+                jet2_pt_JES_down = inTree.readBranch("FatJet2_pt_JES_down")
+                jet1_msoftdrop_JES_down = inTree.readBranch("FatJet1_msoftdrop_JES_down")
+                jet2_msoftdrop_JES_down = inTree.readBranch("FatJet2_msoftdrop_JES_down")
+
+                jet1_pt_JER_up = inTree.readBranch("FatJet1_pt_JER_up")
+                jet2_pt_JER_up = inTree.readBranch("FatJet2_pt_JER_up")
+                jet1_msoftdrop_JER_up = inTree.readBranch("FatJet1_msoftdrop_JER_up")
+                jet2_msoftdrop_JER_up = inTree.readBranch("FatJet2_msoftdrop_JER_up")
+
+                jet1_pt_JER_down = inTree.readBranch("FatJet1_pt_JER_down")
+                jet2_pt_JER_down = inTree.readBranch("FatJet2_pt_JER_down")
+                jet1_msoftdrop_JER_down = inTree.readBranch("FatJet1_msoftdrop_JER_down")
+                jet2_msoftdrop_JER_down = inTree.readBranch("FatJet2_msoftdrop_JER_down")
+
+                jet1_msoftdrop_JMS_up = inTree.readBranch("FatJet1_msoftdrop_JMS_up")
+                jet2_msoftdrop_JMS_up = inTree.readBranch("FatJet2_msoftdrop_JMS_up")
+
+                jet1_msoftdrop_JMS_down = inTree.readBranch("FatJet1_msoftdrop_JMS_down")
+                jet2_msoftdrop_JMS_down = inTree.readBranch("FatJet2_msoftdrop_JMS_down")
+
+                jet1_msoftdrop_JMR_up = inTree.readBranch("FatJet1_msoftdrop_JMR_up")
+                jet2_msoftdrop_JMR_up = inTree.readBranch("FatJet2_msoftdrop_JMR_up")
+
+                jet1_msoftdrop_JMR_down = inTree.readBranch("FatJet1_msoftdrop_JMR_down")
+                jet2_msoftdrop_JMR_down = inTree.readBranch("FatJet2_msoftdrop_JMR_down")
+
+
+
+                jet1.JME_vars = [jet1_pt_JES_up, jet1_msoftdrop_JES_up, jet1_pt_JES_down, jet1_msoftdrop_JES_down, 
+                               jet1_pt_JER_up, jet1_msoftdrop_JER_up, jet1_pt_JER_down, jet1_msoftdrop_JER_down,
+                               jet1_msoftdrop_JMS_up, jet1_msoftdrop_JMS_down, jet1_msoftdrop_JMR_up, jet1_msoftdrop_JMR_down]
+
+                jet2.JME_vars = [jet2_pt_JES_up, jet2_msoftdrop_JES_up, jet2_pt_JES_down, jet2_msoftdrop_JES_down, 
+                               jet2_pt_JER_up, jet2_msoftdrop_JER_up, jet2_pt_JER_down, jet2_msoftdrop_JER_down,
+                               jet2_msoftdrop_JMS_up, jet2_msoftdrop_JMS_down, jet2_msoftdrop_JMR_up, jet2_msoftdrop_JMR_down]
+
+
+
+                #compute mjj for JES, JER variations
+                jet1_4vec_JES_up = ROOT.Math.PtEtaPhiMVector(jet1_pt_JES_up, jet1.eta, jet1.phi, jet1.msoftdrop_corr)
+                jet2_4vec_JES_up = ROOT.Math.PtEtaPhiMVector(jet2_pt_JES_up, jet2.eta, jet2.phi, jet2.msoftdrop_corr)
+                mjj_JES_up = (jet1_4vec_JES_up + jet2_4vec_JES_up).M()
+
+                jet1_4vec_JES_down = ROOT.Math.PtEtaPhiMVector(jet1_pt_JES_down, jet1.eta, jet1.phi, jet1.msoftdrop_corr)
+                jet2_4vec_JES_down = ROOT.Math.PtEtaPhiMVector(jet2_pt_JES_down, jet2.eta, jet2.phi, jet2.msoftdrop_corr)
+                mjj_JES_down = (jet1_4vec_JES_down + jet2_4vec_JES_down).M()
+
+                jet1_4vec_JER_up = ROOT.Math.PtEtaPhiMVector(jet1_pt_JER_up, jet1.eta, jet1.phi, jet1.msoftdrop_corr)
+                jet2_4vec_JER_up = ROOT.Math.PtEtaPhiMVector(jet2_pt_JER_up, jet2.eta, jet2.phi, jet2.msoftdrop_corr)
+                mjj_JER_up = (jet1_4vec_JER_up + jet2_4vec_JER_up).M()
+
+                jet1_4vec_JER_down = ROOT.Math.PtEtaPhiMVector(jet1_pt_JER_down, jet1.eta, jet1.phi, jet1.msoftdrop_corr)
+                jet2_4vec_JER_down = ROOT.Math.PtEtaPhiMVector(jet2_pt_JER_down, jet2.eta, jet2.phi, jet2.msoftdrop_corr)
+                mjj_JER_down = (jet1_4vec_JER_down + jet2_4vec_JER_down).M()
+
+
+                #compute if modified 4-vecs pass pre-selection
+                if(mjj_JES_up >= mjj_cut and jet1_pt_JES_up >= jet_min_pt and jet2_pt_JES_up >= jet_min_pt): n_JES_up +=1
+                if(mjj_JES_down >= mjj_cut and jet1_pt_JES_down >= jet_min_pt and jet2_pt_JES_down >= jet_min_pt): n_JES_down +=1
+                if(mjj_JER_up >= mjj_cut and jet1_pt_JER_up >= jet_min_pt and jet2_pt_JER_up >= jet_min_pt): n_JER_up +=1
+                if(mjj_JER_down >= mjj_cut and jet1_pt_JER_down >= jet_min_pt and jet2_pt_JER_down >= jet_min_pt): n_JER_down +=1
+                
+
+                if(jet2.msoftdrop_corr > jet1.msoftdrop_corr):
+                    #if corrected mass of jet2 is now larger than jet1, swap
+                    temp = jet1
+                    jet1 = jet2
+                    jet2 = temp
+
+
+                #recompute mjj for nominal case
+                jet1_4vec = ROOT.Math.PtEtaPhiMVector(jet1.pt_corr, jet1.eta, jet1.phi, jet1.msoftdrop_corr)
+                jet2_4vec = ROOT.Math.PtEtaPhiMVector(jet2.pt_corr, jet2.eta, jet2.phi, jet2.msoftdrop_corr)
+
+                #print(jet1.msoftdrop, jet1.msoftdrop_corr, jet2.msoftdrop, jet2.msoftdrop_corr)
+
+
+
+                dijet = jet1_4vec + jet2_4vec
+                mjj = dijet.M()
+
+
+
+            if(mjj< mjj_cut or jet1.pt < jet_min_pt or jet2.pt < jet_min_pt): continue
         
 
             saved+=1
-            out.fill_event(inTree, event, jet1, jet2, jet3, PFCands, subjets, mjj)
+            out.fill_event(inTree, event, jet1, jet2, jet3, PFCands, subjets, mjj, num_jets)
             if(nEventsMax > 0 and saved >= nEventsMax): break
 # -------- End Loop over tree-------------------------------------
 # -------- End Loop over files-------------------------------------
 
     efficiency = float(saved)/count
-    out.final_write_out(efficiency)
+    efficiency_JES_up = efficiency_JES_down = efficiency_JER_up = efficiency_JER_down = -1.
+
+    if(include_systematics):
+        efficiency_JES_up = float(n_JES_up)/count
+        efficiency_JES_down = float(n_JES_down)/count
+        efficiency_JER_up = float(n_JER_up)/count
+        efficiency_JER_down = float(n_JER_down)/count
+
+
+    out.final_write_out(efficiency, efficiency_JES_up, efficiency_JES_down, efficiency_JER_up, efficiency_JER_down)
     out.normalize_sys_weights()
     out.add_d_eta_eff()
     print("Done. Selected %i events. Selection efficiency is %.3f \n" % (saved, out.preselection_eff))
+    if(include_systematics):
+        with h5py.File(out.output_name, "r") as f:
+                print("Eff JES_up %.3f " % f['preselection_eff_JES_up'][0] )
+                print("Eff JES_down %.3f " % f['preselection_eff_JES_down'][0] )
+                print("Eff JER_up %.3f " % f['preselection_eff_JER_up'][0])
+                print("Eff JER_down %.3f " % f['preselection_eff_JER_down'][0] )
+
     print("Outputed to %s" % outputFileName)
     return saved
 
