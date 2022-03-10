@@ -410,11 +410,20 @@ def dijetfit(options):
         res2.GetEntry(i)
         if(res2.quantileExpected == -1):  # obs limit
             obs_limit = res2.limit
-        if(abs(res2.quantileExpected - 0.5) < eps):  # exp limit
+        elif(abs(res2.quantileExpected - 0.5) < eps):  # exp limit
             exp_limit = res2.limit
+        elif(abs(res2.quantileExpected - 0.025) < eps):  # 2sigma, low
+            exp_two_low = res2.limit
+        elif(abs(res2.quantileExpected - 0.16) < eps):  # 1sigma, low
+            exp_low = res2.limit
+        elif(abs(res2.quantileExpected - 0.84) < eps):  # 1sigma, high
+            exp_high = res2.limit
+        elif(abs(res2.quantileExpected - 0.975) < eps):  # 2sigma, high
+            exp_two_high = res2.limit
 
     print("Obs limit is %.3f (%.1f events)" % (obs_limit, obs_limit*sig_norm))
     print("Expected was %.3f (%.1f events)" % (exp_limit, exp_limit*sig_norm))
+    print("Expected range %.1f-%.1f (one sigma), %.1f-%.1f (two sigma)" % (exp_low * sig_norm, exp_high*sig_norm, exp_two_low * sig_norm, exp_two_high * sig_norm))
 
     f_pval = ROOT.TFile(f_pval_name, "READ")
     res3 = f_pval.Get("limit")
@@ -438,6 +447,10 @@ def dijetfit(options):
     results['pval'] = pval
     results['obs_lim_events'] = obs_limit*sig_norm
     results['exp_lim_events'] = exp_limit*sig_norm
+    results['exp_lim_1sig_low'] = exp_low * sig_norm
+    results['exp_lim_2sig_low'] = exp_two_low * sig_norm
+    results['exp_lim_1sig_high'] = exp_high * sig_norm
+    results['exp_lim_2sig_high'] = exp_two_high* sig_norm
     results['sig_norm_unc'] = options.sig_norm_unc
     results['mass'] = options.mass
 

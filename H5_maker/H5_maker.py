@@ -243,7 +243,8 @@ class Outputer:
                 F_up = scale_weights[5] / self.avg_weights['LHEScaleWeight[5]']
                 R_up = scale_weights[7] / self.avg_weights['LHEScaleWeight[7]']
                 RF_up = scale_weights[8] / self.avg_weights['LHEScaleWeight[8]']
-            elif[nScale == 8]:
+            elif(nScale == 8):
+                #some files only have 8 weights
                 scale_weights = inTree.readBranch("LHEScaleWeight")
                 
                 RF_down = scale_weights[0] / self.avg_weights['LHEScaleWeight[0]']
@@ -265,90 +266,6 @@ class Outputer:
             #clip extreme variations
             self.sys_weights[self.idx] = np.clip(np.array(sys_weights, dtype=np.float32), 1e-3, 1e3)
 
-            #JME Corrections 
-            dijet_idx1  = inTree.readBranch("DijetIdx1")
-            dijet_idx2  = inTree.readBranch("DijetIdx2")
-
-            if(dijet_idx1 != jet1.idx or dijet_idx2 != jet2.idx):
-                print("Dijet indices from TIMBER and this selector don't match!")
-                print("TIMBER : %i %i. This : %i %i " %(dijet_idx1, dijet_idx2, jet1.idx, jet2.idx))
-                print(jet1.msoftdrop, jet2.msoftdrop)
-                sys.exit(1)
-
-
-            #nominal
-            jet1.pt_corr = inTree.readBranch("FatJet1_pt_corr")
-            jet2.pt_corr = inTree.readBranch("FatJet2_pt_corr")
-
-            jet1.msoftdrop_corr = inTree.readBranch("FatJet1_msoftdrop_corr")
-            jet2.msoftdrop_corr = inTree.readBranch("FatJet2_msoftdrop_corr")
-
-
-            #systematics
-            jet1_pt_JES_up = inTree.readBranch("FatJet1_pt_JES_up")
-            jet2_pt_JES_up = inTree.readBranch("FatJet2_pt_JES_up")
-            jet1_msoftdrop_JES_up = inTree.readBranch("FatJet1_msoftdrop_JES_up")
-            jet2_msoftdrop_JES_up = inTree.readBranch("FatJet2_msoftdrop_JES_up")
-
-            jet1_pt_JES_down = inTree.readBranch("FatJet1_pt_JES_down")
-            jet2_pt_JES_down = inTree.readBranch("FatJet2_pt_JES_down")
-            jet1_msoftdrop_JES_down = inTree.readBranch("FatJet1_msoftdrop_JES_down")
-            jet2_msoftdrop_JES_down = inTree.readBranch("FatJet2_msoftdrop_JES_down")
-
-            jet1_pt_JER_up = inTree.readBranch("FatJet1_pt_JER_up")
-            jet2_pt_JER_up = inTree.readBranch("FatJet2_pt_JER_up")
-            jet1_msoftdrop_JER_up = inTree.readBranch("FatJet1_msoftdrop_JER_up")
-            jet2_msoftdrop_JER_up = inTree.readBranch("FatJet2_msoftdrop_JER_up")
-
-            jet1_pt_JER_down = inTree.readBranch("FatJet1_pt_JER_down")
-            jet2_pt_JER_down = inTree.readBranch("FatJet2_pt_JER_down")
-            jet1_msoftdrop_JER_down = inTree.readBranch("FatJet1_msoftdrop_JER_down")
-            jet2_msoftdrop_JER_down = inTree.readBranch("FatJet2_msoftdrop_JER_down")
-
-            jet1_msoftdrop_JMS_up = inTree.readBranch("FatJet1_msoftdrop_JMS_up")
-            jet2_msoftdrop_JMS_up = inTree.readBranch("FatJet2_msoftdrop_JMS_up")
-
-            jet1_msoftdrop_JMS_down = inTree.readBranch("FatJet1_msoftdrop_JMS_down")
-            jet2_msoftdrop_JMS_down = inTree.readBranch("FatJet2_msoftdrop_JMS_down")
-
-            jet1_msoftdrop_JMR_up = inTree.readBranch("FatJet1_msoftdrop_JMR_up")
-            jet2_msoftdrop_JMR_up = inTree.readBranch("FatJet2_msoftdrop_JMR_up")
-
-            jet1_msoftdrop_JMR_down = inTree.readBranch("FatJet1_msoftdrop_JMR_down")
-            jet2_msoftdrop_JMR_down = inTree.readBranch("FatJet2_msoftdrop_JMR_down")
-
-
-
-            jet1.JME_vars = [jet1_pt_JES_up, jet1_msoftdrop_JES_up, jet1_pt_JES_down, jet1_msoftdrop_JES_down, 
-                           jet1_pt_JER_up, jet1_msoftdrop_JER_up, jet1_pt_JER_down, jet1_msoftdrop_JER_down,
-                           jet1_msoftdrop_JMS_up, jet1_msoftdrop_JMS_down, jet1_msoftdrop_JMR_up, jet1_msoftdrop_JMR_down]
-
-            jet2.JME_vars = [jet2_pt_JES_up, jet2_msoftdrop_JES_up, jet2_pt_JES_down, jet2_msoftdrop_JES_down, 
-                           jet2_pt_JER_up, jet2_msoftdrop_JER_up, jet2_pt_JER_down, jet2_msoftdrop_JER_down,
-                           jet2_msoftdrop_JMS_up, jet2_msoftdrop_JMS_down, jet2_msoftdrop_JMR_up, jet2_msoftdrop_JMR_down]
-
-            if(jet2.msoftdrop_corr > jet1.msoftdrop_corr):
-                #if corrected mass of jet2 is now larger than jet1, swap
-                temp = jet1
-                jet1 = jet2
-                jet2 = temp
-
-
-
-            self.jet1_JME_vars[self.idx] = jet1.JME_vars
-            self.jet2_JME_vars[self.idx] = jet2.JME_vars
-
-
-            #recompute mjj for nominal case
-            jet1_4vec = ROOT.Math.PtEtaPhiMVector(jet1.pt_corr, jet1.eta, jet1.phi, jet1.msoftdrop_corr)
-            jet2_4vec = ROOT.Math.PtEtaPhiMVector(jet2.pt_corr, jet2.eta, jet2.phi, jet2.msoftdrop_corr)
-
-            #print(jet1.msoftdrop, jet1.msoftdrop_corr, jet2.msoftdrop, jet2.msoftdrop_corr)
-
-
-
-            dijet = jet1_4vec + jet2_4vec
-            mjj = dijet.M()
 
             
 
@@ -697,6 +614,95 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             if(jet1 == None or jet2 == None): continue
 
             if(inHEMRegion(jet1, year) or inHEMRegion(jet2, year)): continue
+
+
+            #JME Corrections 
+            dijet_idx1  = inTree.readBranch("DijetIdx1")
+            dijet_idx2  = inTree.readBranch("DijetIdx2")
+
+            if(dijet_idx1 != jet1.idx or dijet_idx2 != jet2.idx):
+                print("Dijet indices from TIMBER and this selector don't match!")
+                print("TIMBER : %i %i. This : %i %i " %(dijet_idx1, dijet_idx2, jet1.idx, jet2.idx))
+                print(jet1.msoftdrop, jet2.msoftdrop)
+                sys.exit(1)
+
+
+            #nominal
+            jet1.pt_corr = inTree.readBranch("FatJet1_pt_corr")
+            jet2.pt_corr = inTree.readBranch("FatJet2_pt_corr")
+
+            jet1.msoftdrop_corr = inTree.readBranch("FatJet1_msoftdrop_corr")
+            jet2.msoftdrop_corr = inTree.readBranch("FatJet2_msoftdrop_corr")
+
+
+            #systematics
+            jet1_pt_JES_up = inTree.readBranch("FatJet1_pt_JES_up")
+            jet2_pt_JES_up = inTree.readBranch("FatJet2_pt_JES_up")
+            jet1_msoftdrop_JES_up = inTree.readBranch("FatJet1_msoftdrop_JES_up")
+            jet2_msoftdrop_JES_up = inTree.readBranch("FatJet2_msoftdrop_JES_up")
+
+            jet1_pt_JES_down = inTree.readBranch("FatJet1_pt_JES_down")
+            jet2_pt_JES_down = inTree.readBranch("FatJet2_pt_JES_down")
+            jet1_msoftdrop_JES_down = inTree.readBranch("FatJet1_msoftdrop_JES_down")
+            jet2_msoftdrop_JES_down = inTree.readBranch("FatJet2_msoftdrop_JES_down")
+
+            jet1_pt_JER_up = inTree.readBranch("FatJet1_pt_JER_up")
+            jet2_pt_JER_up = inTree.readBranch("FatJet2_pt_JER_up")
+            jet1_msoftdrop_JER_up = inTree.readBranch("FatJet1_msoftdrop_JER_up")
+            jet2_msoftdrop_JER_up = inTree.readBranch("FatJet2_msoftdrop_JER_up")
+
+            jet1_pt_JER_down = inTree.readBranch("FatJet1_pt_JER_down")
+            jet2_pt_JER_down = inTree.readBranch("FatJet2_pt_JER_down")
+            jet1_msoftdrop_JER_down = inTree.readBranch("FatJet1_msoftdrop_JER_down")
+            jet2_msoftdrop_JER_down = inTree.readBranch("FatJet2_msoftdrop_JER_down")
+
+            jet1_msoftdrop_JMS_up = inTree.readBranch("FatJet1_msoftdrop_JMS_up")
+            jet2_msoftdrop_JMS_up = inTree.readBranch("FatJet2_msoftdrop_JMS_up")
+
+            jet1_msoftdrop_JMS_down = inTree.readBranch("FatJet1_msoftdrop_JMS_down")
+            jet2_msoftdrop_JMS_down = inTree.readBranch("FatJet2_msoftdrop_JMS_down")
+
+            jet1_msoftdrop_JMR_up = inTree.readBranch("FatJet1_msoftdrop_JMR_up")
+            jet2_msoftdrop_JMR_up = inTree.readBranch("FatJet2_msoftdrop_JMR_up")
+
+            jet1_msoftdrop_JMR_down = inTree.readBranch("FatJet1_msoftdrop_JMR_down")
+            jet2_msoftdrop_JMR_down = inTree.readBranch("FatJet2_msoftdrop_JMR_down")
+
+
+
+            jet1.JME_vars = [jet1_pt_JES_up, jet1_msoftdrop_JES_up, jet1_pt_JES_down, jet1_msoftdrop_JES_down, 
+                           jet1_pt_JER_up, jet1_msoftdrop_JER_up, jet1_pt_JER_down, jet1_msoftdrop_JER_down,
+                           jet1_msoftdrop_JMS_up, jet1_msoftdrop_JMS_down, jet1_msoftdrop_JMR_up, jet1_msoftdrop_JMR_down]
+
+            jet2.JME_vars = [jet2_pt_JES_up, jet2_msoftdrop_JES_up, jet2_pt_JES_down, jet2_msoftdrop_JES_down, 
+                           jet2_pt_JER_up, jet2_msoftdrop_JER_up, jet2_pt_JER_down, jet2_msoftdrop_JER_down,
+                           jet2_msoftdrop_JMS_up, jet2_msoftdrop_JMS_down, jet2_msoftdrop_JMR_up, jet2_msoftdrop_JMR_down]
+
+            if(jet2.msoftdrop_corr > jet1.msoftdrop_corr):
+                #if corrected mass of jet2 is now larger than jet1, swap
+                temp = jet1
+                jet1 = jet2
+                jet2 = temp
+
+
+
+            self.jet1_JME_vars[self.idx] = jet1.JME_vars
+            self.jet2_JME_vars[self.idx] = jet2.JME_vars
+
+
+            #recompute mjj for nominal case
+            jet1_4vec = ROOT.Math.PtEtaPhiMVector(jet1.pt_corr, jet1.eta, jet1.phi, jet1.msoftdrop_corr)
+            jet2_4vec = ROOT.Math.PtEtaPhiMVector(jet2.pt_corr, jet2.eta, jet2.phi, jet2.msoftdrop_corr)
+
+            #print(jet1.msoftdrop, jet1.msoftdrop_corr, jet2.msoftdrop, jet2.msoftdrop_corr)
+
+
+
+            dijet = jet1_4vec + jet2_4vec
+            mjj = dijet.M()
+
+
+
 
             #Order jets so jet1 is always the higher mass one
             if(jet1.msoftdrop < jet2.msoftdrop):
