@@ -94,6 +94,7 @@ class Outputer:
         self.nBatch = 0
         self.n_pf_cands = 100 #how many PF candidates to save (max)
         self.include_systematics = include_systematics
+        self.n_SVs = 10 #how many SVs candidates to save (max)
         self.sort_pfcands = sort_pfcands
         self.year = year
         self.reset()
@@ -102,6 +103,8 @@ class Outputer:
         self.idx = 0
         self.jet1_PFCands = np.zeros((self.batch_size, self.n_pf_cands,4), dtype=np.float16)
         self.jet2_PFCands = np.zeros((self.batch_size, self.n_pf_cands, 4), dtype=np.float16)
+        self.jet1_SVs = np.zeros((self.batch_size, self.n_SVs,6), dtype=np.float32)
+        self.jet2_SVs = np.zeros((self.batch_size, self.n_SVs, 6), dtype=np.float32)
         self.jet1_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
         self.jet2_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
         self.jet_kinematics = np.zeros((self.batch_size, 14), dtype=np.float32)
@@ -179,6 +182,7 @@ class Outputer:
         MET_phi = inTree.readBranch('MET_phi')
         eventNum = inTree.readBranch('event')
         run = inTree.readBranch('run')
+        SVs = Collection(event, 'FatJetSVs')
 
         event_info = [eventNum, MET, MET_phi, genWeight, leptonic_decay, run, self.year, num_jets]
 
@@ -323,6 +327,29 @@ class Outputer:
             cand = ROOT.Math.PtEtaPhiMVector(PFCands[idx].pt, PFCands[idx].eta, PFCands[idx].phi, PFCands[idx].mass)
             jet2_PFCands.append([cand.Px(), cand.Py(), cand.Pz(), cand.E()])
 
+        #SV's
+        jet1_SVs = []
+        jet2_SVs = []
+
+        for SV in SVs:
+            SV_vec = [SV.mass, SV.pt, SV.ntracks, SV.normchi2, SV.dxysig, SV.d3dsig]
+            if(SV.jetIdx == jet1.idx):
+                jet1_SVs.append(SV_vec)
+            elif(SV.jetIdx == jet2.idx):
+                jet2_SVs.append(SV_vec)
+
+        j1_nSVs = min(len(jet1_SVs), self.n_SVs)
+        j2_nSVs = min(len(jet2_SVs), self.n_SVs)
+
+        jet1_SVs = jet1_SVs[:j1_nSVs]
+        jet2_SVs = jet2_SVs[:j2_nSVs]
+
+        if(j1_nSVs > 0): self.jet1_SVs[self.idx, :j1_nSVs] = np.array(jet1_SVs, dtype = np.float32)
+        if(j2_nSVs > 0): self.jet2_SVs[self.idx, :j2_nSVs] = np.array(jet2_SVs, dtype = np.float32)
+
+        #print(self.jet2_SVs[self.idx])
+
+
 
         self.event_info[self.idx] = np.array(event_info, dtype=np.float32)
         self.jet_kinematics[self.idx] = np.array(jet_kinematics, dtype = np.float32)
@@ -359,6 +386,8 @@ class Outputer:
                 f.create_dataset("jet2_extraInfo", data=self.jet2_extraInfo, chunks = True, maxshape=(None, self.jet2_extraInfo.shape[1]))
                 f.create_dataset("jet1_PFCands", data=self.jet1_PFCands, chunks = True, maxshape=(None, self.jet1_PFCands.shape[1], 4), compression='gzip')
                 f.create_dataset("jet2_PFCands", data=self.jet2_PFCands, chunks = True, maxshape=(None, self.jet2_PFCands.shape[1], 4), compression='gzip')
+                f.create_dataset("jet1_SVs", data=self.jet1_SVs, chunks = True, maxshape=(None, self.n_SVs, 6), compression='gzip')
+                f.create_dataset("jet2_SVs", data=self.jet2_SVs, chunks = True, maxshape=(None, self.n_SVs, 6), compression='gzip')
                 if(self.include_systematics):
                     f.create_dataset("sys_weights", data=self.sys_weights, chunks = True, maxshape=(None, self.sys_weights.shape[1]))
                     f.create_dataset("jet1_JME_vars", data=self.jet1_JME_vars, chunks = True, maxshape=(None, self.jet1_JME_vars.shape[1]))
@@ -373,6 +402,8 @@ class Outputer:
                 utils.append_h5(f,'jet2_extraInfo',self.jet2_extraInfo)
                 utils.append_h5(f,'jet1_PFCands',self.jet1_PFCands)
                 utils.append_h5(f,'jet2_PFCands',self.jet2_PFCands)
+                utils.append_h5(f,'jet1_SVs',self.jet1_SVs)
+                utils.append_h5(f,'jet2_SVs',self.jet2_SVs)
                 if(self.include_systematics):
                     utils.append_h5(f,'sys_weights',self.sys_weights)
                     utils.append_h5(f,'jet1_JME_vars',self.jet1_JME_vars)
@@ -389,6 +420,8 @@ class Outputer:
             self.jet2_extraInfo = self.jet2_extraInfo[:self.idx]
             self.jet_kinematics = self.jet_kinematics[:self.idx] 
             self.event_info = self.event_info[:self.idx]
+            self.jet1_SVs = self.jet1_SVs[:self.idx]
+            self.jet2_SVs = self.jet2_SVs[:self.idx]
             if(self.include_systematics):
                 self.sys_weights = self.sys_weights[:self.idx]
                 self.jet1_JME_vars = self.jet1_JME_vars[:self.idx]
@@ -603,7 +636,6 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             pf_conts_start = 0 #keep track of indices for PF candidates
             jet_index = 0
             num_jets = 0
-
             for i,jet in enumerate(AK8Jets):
                 jet.idx = i
                 #jetId : bit1 = loose, bit2 = tight, bit3 = tightLepVeto
