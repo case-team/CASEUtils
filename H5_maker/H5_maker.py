@@ -36,7 +36,9 @@ sys_weights_map = {
         'R_up' : 15,
         'R_down' : 16,
         'RF_up' : 17,
-        'RF_down' : 18
+        'RF_down' : 18,
+        'top_ptrw_up' : 19,
+        'top_ptrw_down' : 20,
         }
 
 JME_vars_map = {
@@ -83,7 +85,8 @@ def get_branch_mean(inTree, branch_name):
 
 
 class Outputer:
-    def __init__(self, outputFileName="out.root", batch_size = 5000, truth_label = 0, sample_type="MC", sort_pfcands = False, include_systematics = True, year = 2017):
+    def __init__(self, outputFileName="out.root", batch_size = 5000, truth_label = 0, sample_type="MC", 
+            sort_pfcands = False, include_systematics = True, do_top_ptrw = False, year = 2017):
 
         self.batch_size = batch_size
         self.output_name = outputFileName
@@ -94,6 +97,8 @@ class Outputer:
         self.nBatch = 0
         self.n_pf_cands = 100 #how many PF candidates to save (max)
         self.include_systematics = include_systematics
+        self.do_top_ptrw = do_top_ptrw
+        self.top_weights = []
         self.n_SVs = 10 #how many SVs candidates to save (max)
         self.sort_pfcands = sort_pfcands
         self.year = year
@@ -109,7 +114,7 @@ class Outputer:
         self.jet2_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
         self.jet_kinematics = np.zeros((self.batch_size, 14), dtype=np.float32)
         self.event_info = np.zeros((self.batch_size, 8), dtype=np.float32)
-        self.sys_weights = np.zeros((self.batch_size, 19), dtype=np.float32)
+        self.sys_weights = np.zeros((self.batch_size, 21), dtype=np.float32)
         self.jet1_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
         self.jet2_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
 
@@ -216,7 +221,6 @@ class Outputer:
             pileup_up = self.normed_weight(inTree, 'Pileup__up') / pileup_nom
             pileup_down = self.normed_weight(inTree, 'Pileup__down') / pileup_nom
 
-            #btag TODO divide out average weight so normalization unchanged?
             btag_nom =  self.normed_weight(inTree, 'lead_sjbtag_corr__nom') * self.normed_weight(inTree, 'sublead_sjbtag_corr__nom')
             btag_up =  self.normed_weight(inTree, 'lead_sjbtag_corr__up') * self.normed_weight(inTree, 'sublead_sjbtag_corr__up') / btag_nom
             btag_down =  self.normed_weight(inTree, 'lead_sjbtag_corr__down') * self.normed_weight(inTree, 'sublead_sjbtag_corr__down') / btag_nom
@@ -259,12 +263,21 @@ class Outputer:
                 R_up = scale_weights[6] / self.avg_weights['LHEScaleWeight[6]']
                 RF_up = scale_weights[7] / self.avg_weights['LHEScaleWeight[7]']
 
+            top_ptrw_nom = top_ptrw_up = top_ptrw_down = 1.0
+            if(self.do_top_ptrw):
+                top_ptrw_nom = inTree.readBranch("TptReweight__nom")
+                top_ptrw_up = inTree.readBranch("TptReweight__up") / top_ptrw_nom
+                top_ptrw_down = inTree.readBranch("TptReweight__down") / top_ptrw_nom
+                self.top_weights.append(top_ptrw_nom)
 
 
 
-            gen_weight = prefire_nom * pileup_nom * btag_nom
+
+
+
+            gen_weight = prefire_nom * pileup_nom * btag_nom * top_ptrw_nom
             sys_weights = [gen_weight, pdf_up, pdf_down, prefire_up, prefire_down, pileup_up, pileup_down, btag_up, btag_down, 
-            PS_ISR_up, PS_ISR_down, PS_FSR_up, PS_FSR_down, F_up, F_down, R_up, R_down, RF_up, RF_down]
+            PS_ISR_up, PS_ISR_down, PS_FSR_up, PS_FSR_down, F_up, F_down, R_up, R_down, RF_up, RF_down, top_ptrw_up, top_ptrw_down]
 
             test = event.lead_sjbtag_corr__vec
 
@@ -472,19 +485,15 @@ class Outputer:
                 f['preselection_eff_JER_up'][0] *= nom_weight_avg
                 f['preselection_eff_JER_down'][0] *= nom_weight_avg
 
-
-                #for key,idx in sys_weights_dict.items():
-                
-        
-
-
-
+                if(self.do_top_ptrw):
+                    avg_top_ptrw = np.mean(self.top_weights)
+                    f.create_dataset("top_ptrw_avg", data=np.array([avg_top_ptrw]))
 
 
 
 
 def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.root", json = '', year = 2016, nEventsMax = -1, sampleType = "MC", 
-        sort_pfcands=True,  include_systematics = False):
+        sort_pfcands=True,  include_systematics = False, do_top_ptrw = False):
     
     if not ((sampleType == "MC") or (sampleType=="data")):
         print("Error! sampleType needs to be set to either data or MC! Please set correct option and retry.")
@@ -497,7 +506,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
     "Flag_HBHENoiseIsoFilter",
     "Flag_EcalDeadCellTriggerPrimitiveFilter",
     "Flag_BadPFMuonFilter",
-    "Flag_BadPFMuonDzFilter",
+    #"Flag_BadPFMuonDzFilter",
     "Flag_eeBadScFilter", 
     ]
     if((year == 2016) or (year == 2016.5)): filters.append("Flag_CSCTightHaloFilter")
@@ -565,7 +574,8 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             inTree= InputTree(TTree) 
             print('Running over %i entries \n' % nTotal)
 
-        out = Outputer(outputFileName, truth_label =  process_flag, sample_type=sampleType, sort_pfcands=sort_pfcands, include_systematics = include_systematics, year = year)
+        out = Outputer(outputFileName, truth_label =  process_flag, sample_type=sampleType, sort_pfcands=sort_pfcands, 
+                include_systematics = include_systematics, year = year, do_top_ptrw = do_top_ptrw)
 
         if(include_systematics):
             out.get_weight_avgs(inTree)
@@ -820,10 +830,13 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
     print("Done. Selected %i events. Selection efficiency is %.3f \n" % (saved, out.preselection_eff))
     if(include_systematics):
         with h5py.File(out.output_name, "r") as f:
-                print("Eff JES_up %.3f " % f['preselection_eff_JES_up'][0] )
-                print("Eff JES_down %.3f " % f['preselection_eff_JES_down'][0] )
-                print("Eff JER_up %.3f " % f['preselection_eff_JER_up'][0])
-                print("Eff JER_down %.3f " % f['preselection_eff_JER_down'][0] )
+            print("Eff JES_up %.3f " % f['preselection_eff_JES_up'][0] )
+            print("Eff JES_down %.3f " % f['preselection_eff_JES_down'][0] )
+            print("Eff JER_up %.3f " % f['preselection_eff_JER_up'][0])
+            print("Eff JER_down %.3f " % f['preselection_eff_JER_down'][0] )
+            if(do_top_ptrw):
+                print("Avg top pt rewight %.3f " % f['top_ptrw_avg'][0])
+                
 
     print("Outputed to %s" % outputFileName)
     return saved
