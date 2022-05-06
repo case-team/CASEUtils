@@ -36,6 +36,7 @@ The data in each keys are:
 
 
 **preselection\_eff**: Single float for whole file. Efficiency of the preselection requirements on this sample
+**d\_eta\_eff** : Single float for whole file. Efficiency of |dEta| < 1.3 cut (after preselection)
 
 **truth\_label** :  single int. Labels  the type of event. 0 is QCD, signals are => 1 (depends on dataset), other backgrounds are TBD but will be < 0
 
@@ -51,6 +52,25 @@ btag score (max deepB score of ak4 subjets) and number of PF constituents for j1
 
 **jet1(2)\_PFCands** : 400 floats. 4 vectors of (up to) 100 PFCands of j1 (j2) in  Px, Py, Pz, E  format. Zero
 padded
+
+
+If `--sys` flag is used, additional columns with info necessary for systematics
+computation are added
+
+**sys\_weights** 21 floats: See `sys_weights_map` dictionary inside H5\_maker.py for map of variable name to index. 
+    "nom_weight" is the nominal weight and all others are the weights for given systematic variation.
+        
+        ```[nom_weight, pdf_up, pdf_down, prefire_up, prefire_down, pileup_up, pileup_down, btag_up, btag_down, 
+        PS_ISR_up, PS_ISR_down, PS_FSR_up, PS_FSR_down, F_up, F_down, R_up, R_down, RF_up, RF_down, top_ptrw_up, top_ptrw_down] ```
+
+**jet1(2)\_JME\_vars**:  12 floats. See `JME_weights_map` dictionary inside H5_maker.py for map of variable name to index.
+The nominal corrections are applied if the systematics turned on, this stores
+variations.
+
+        ```[pt_JES_up, m_JES_up, pt_JES_down, m_JES_down, pt_JER_up, m_JER_up, pt_JER_down, m_JER_down, m_JMS_up, m_JMS_down, m_JMR_up, m_JMR_down]```
+
+Variations of the **preselection\_eff** for JES and JER systematic variations are also saved (eg `preselection_eff_JES_up`)
+
 
 
 

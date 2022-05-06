@@ -1,7 +1,7 @@
 import h5py, math, commands, random
 from array import array
 import numpy as np
-import time, sys, os, optparse, json
+import time, sys, os, optparse, json, copy
 
 import ROOT
 ROOT.gStyle.SetOptStat(0)
@@ -11,7 +11,64 @@ tdrstyle.setTDRStyle()
 ROOT.gROOT.SetBatch(True)
 ROOT.RooRandom.randomGenerator().SetSeed(random.randint(0, 1e+6))
 
-
+# function to extract string from function -> in order write a proper json file
+def returnString(func,ftype):
+    if func.GetName().find("corr")!=-1:
+        st = "("+str(func.GetParameter(0))+" + ("+str(func.GetParameter(1))+")*MJ1 + ("+str(func.GetParameter(2))+")*MJ2  + ("+str(func.GetParameter(3))+")*MJ1*MJ2)"
+        if func.GetName().find("sigma")!=-1:
+            st = "("+str(func.GetParameter(0))+" + ("+str(func.GetParameter(1))+")*MJ1 + ("+str(func.GetParameter(2))+")*MJ2 )"
+        return st
+    else:
+        if ftype.find("pol")!=-1:
+            st='(0'
+            if func.GetName().find("corr")!=-1: 
+                n = 1. #func.Integral(55,215)
+                st = "(0"
+                for i in range(0,func.GetNpar()):
+                    st = st+"+("+str(func.GetParameter(i))+")"+("*(MJ1+MJ2)/2."*i)
+                st+=")/"+str(n)
+            else:
+                for i in range(0,func.GetNpar()):
+                    st=st+"+("+str(func.GetParameter(i))+")"+("*MH"*i)
+                st+=")"
+            return st
+        if ftype.find("1/sqrt")!=-1:
+            st='(0'
+            if func.GetName().find("corr")!=-1:
+                n = 1. # func.Integral(55,215)
+                st = str(func.GetParameter(0))+"+("+str(func.GetParameter(1))+")*1/sqrt((MJ1+MJ2)/2.)/"+str(n)
+            else:
+                st = str(func.GetParameter(0))+"+("+str(func.GetParameter(1))+")"+")*1/sqrt(MH)"
+                st+=")"
+            return st
+        if ftype.find("sqrt")!=-1 and ftype.find("1/")==-1:
+            n =1.
+            st='(0'
+            if func.GetName().find("corr")!=-1: st = str(func.GetParameter(0))+"+("+str(func.GetParameter(1))+")"+"*sqrt((MJ1+MJ2)/2.))/"+str(n)
+            else:
+                st = str(func.GetParameter(0))+"+("+str(func.GetParameter(1))+")"+"*sqrt(MH)"
+                st+=")"
+            return st    
+        if ftype.find("llog")!=-1:
+            return str(func.GetParameter(0))+"+"+str(func.GetParameter(1))+"*log(MH)"
+        if ftype.find("laur")!=-1:
+            st='(0'
+            for i in range(0,func.GetNpar()):
+                st=st+"+("+str(func.GetParameter(i))+")"+"/MH^"+str(i)
+            st+=")"
+            return st    
+        if ftype.find("spline")!=-1:
+            print "write json for spline function: a list and not a string will be returned in this case"
+            st=[]
+            nnknots = func.GetNp()
+            for i in range(0,nnknots):
+                x = ROOT.Double(0) 
+                y = ROOT.Double(0) 
+                func.GetKnot(i,x,y)
+                st.append([x,y])
+            return st
+        else:
+            return ""
 
 def get_palette(mode):
 
@@ -279,10 +336,22 @@ def load_h5_bkg(h_file, hist, correctStats = False):
 def load_h5_sig(h_file, hist, sig_mjj, correctStats =False):
     event_num = None
     with h5py.File(h_file, "r") as f:
-        mjj = f['mjj'][()]
-        is_sig = f['truth_label'][()]
+        try:
+            mjj = f['jet_kinematics'][:, 0]
+        except:
+            mjj = f['mjj'][()]
+
+        num_evts = mjj.shape[0]
+        is_sig = f['truth_label'][()].flatten()
+
+
+        if(is_sig.shape[0] != mjj.shape[0]):
+            #fix bug in old h5 maker where is_sig array would be too long
+            is_sig = is_sig[:num_evts]
+        
         if(correctStats):
             event_num = f['event_num'][()]
+
 
     mask = (mjj > 0.8*sig_mjj) & (mjj < 1.2*sig_mjj) & (is_sig > 0.9)
     if(correctStats): event_num = event_num[mask]
