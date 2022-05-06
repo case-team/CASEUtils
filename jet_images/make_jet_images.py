@@ -11,7 +11,8 @@ parser = OptionParser()
 parser.add_option("--npix", default =32, type = int, help="Number of pixels")
 parser.add_option("-i", "--input", dest = 'fin_name',  default = 'test.h5', help="Input file name")
 parser.add_option("-o", "--output", dest='fout_name',  default = '', help="Output file name (leave blank for adding images to input file")
-parser.add_option("--deta", dest='deta',  default = -1.,type = float,  help="Apply an eta cut before making images")
+parser.add_option("--deta_min", dest='deta_min',  default = -1.,type = float,  help="Apply an (min) delta eta cut before making images")
+parser.add_option("--deta", dest='deta',  default = -1.,type = float,  help="Apply a max delta eta cut before making images")
 options, args = parser.parse_args()
 
 # Load files
@@ -19,7 +20,8 @@ batch_size = 5000
 fin_name = options.fin_name
 fout_name = options.fout_name
 if(fout_name == ""): fout_name = fin_name
-excludes = []
+#excludes = []
+excludes = ['jet1_PFCands', 'jet2_PFCands']
 npix = options.npix
 img_width = 1.2
 rotate = False
@@ -29,20 +31,22 @@ overwrite = True
 if(fin_name != fout_name):
     #output to different file
     print("Going to copy all the data from %s to %s, will add jet images after " % (fin_name, fout_name))
-    if(len(excludes) == 0 and options.deta < 0):
+    if(len(excludes) == 0 and options.deta < 0 and options.deta_min < 0):
         os.system("cp %s %s" % (fin_name, fout_name))
         fin = h5py.File(fin_name, 'r')
         fout = h5py.File(fout_name, 'a')
     else:
         fin = h5py.File(fin_name, 'r')
         fout = h5py.File(fout_name, 'w')
-        if(options.deta > 0):
+        if(options.deta > 0 or options.deta_min > 0):
             deta = fin['jet_kinematics'][:,1]
-            mask = deta < options.deta
+            mask = deta > 0
+            if(options.deta > 0): mask = mask & ( deta < options.deta)
+            if(options.deta_min > 0): mask = mask & (deta > options.deta_min)
             print(mask.shape)
 
         for key in fin.keys():
-            if key in excludes:
+            if key in excludes or 'images' in key:
                 continue
             print("Copying key %s" % key)
             if(options.deta < 0 or fin[key].shape[0] == 1): 
@@ -79,11 +83,11 @@ for i in range(iters):
     start_idx = i*batch_size
     end_idx = min(total_size, (i+1)*batch_size)
 
-    jet1_PFCands = fout['jet1_PFCands'][start_idx:end_idx]
-    jet2_PFCands = fout['jet2_PFCands'][start_idx:end_idx]
+    jet1_PFCands = fin['jet1_PFCands'][start_idx:end_idx]
+    jet2_PFCands = fin['jet2_PFCands'][start_idx:end_idx]
 
-    j1_4vec = fout['jet_kinematics'][start_idx:end_idx,2:6]
-    j2_4vec = fout['jet_kinematics'][start_idx:end_idx,6:10]
+    j1_4vec = fin['jet_kinematics'][start_idx:end_idx,2:6]
+    j2_4vec = fin['jet_kinematics'][start_idx:end_idx,6:10]
 
     j1_images = np.zeros((end_idx - start_idx, npix, npix), dtype = np.float16)
     j2_images = np.zeros((end_idx - start_idx, npix, npix), dtype = np.float16)
