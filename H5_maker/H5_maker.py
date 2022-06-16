@@ -63,9 +63,12 @@ JME_vars_map = {
 
 def nPFCounter(index, event):
     count = 0
-    jet_indices = event.FatJetPFCands_jetIdx
-    length = len(event.FatJetPFCands_jetIdx)
+    jet_indices = event.JetPFCands_jetIdx
+    length = len(event.JetPFCands_jetIdx)
+    idcs = []
+
     for i in range(length):
+        idcs.append(jet_indices[i])
         if jet_indices[i] == index:
             count += 1
     
@@ -110,8 +113,8 @@ class Outputer:
         self.jet2_PFCands = np.zeros((self.batch_size, self.n_pf_cands, 4), dtype=np.float16)
         self.jet1_SVs = np.zeros((self.batch_size, self.n_SVs,6), dtype=np.float32)
         self.jet2_SVs = np.zeros((self.batch_size, self.n_SVs, 6), dtype=np.float32)
-        self.jet1_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
-        self.jet2_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
+        self.jet1_extraInfo = np.zeros((self.batch_size, 2), dtype=np.float32)
+        self.jet2_extraInfo = np.zeros((self.batch_size, 2), dtype=np.float32)
         self.jet_kinematics = np.zeros((self.batch_size, 14), dtype=np.float32)
         self.event_info = np.zeros((self.batch_size, 8), dtype=np.float32)
         self.sys_weights = np.zeros((self.batch_size, 21), dtype=np.float32)
@@ -137,7 +140,6 @@ class Outputer:
         return False
 
     def get_pfcands_sorted(self, pfcands):
-        
         
         pfcands_pt = np.sqrt(pfcands[:, 0]**2 + pfcands[:, 1]**2)
         sorted_idx = np.flip(np.argsort(pfcands_pt))
@@ -194,8 +196,6 @@ class Outputer:
         jet1.pt_corr = jet1.pt
         jet2.pt_corr = jet2.pt
 
-        jet1.msoftdrop_corr = jet1.msoftdrop
-        jet2.msoftdrop_corr = jet2.msoftdrop
 
 
         sys_weights = []
@@ -300,29 +300,22 @@ class Outputer:
 
 
 
-        jet_kinematics = [mjj, d_eta, jet1.pt_corr, jet1.eta, jet1.phi, jet1.msoftdrop_corr, jet2.pt_corr, jet2.eta, jet2.phi, jet2.msoftdrop_corr]
+        jet_kinematics = [mjj, d_eta, jet1.pt_corr, jet1.eta, jet1.phi, jet1.mass, jet2.pt_corr, jet2.eta, jet2.phi, jet2.mass]
 
         if(jet3 != None):
-            jet_kinematics.extend([jet3.pt, jet3.eta, jet3.phi, jet3.msoftdrop])
+            jet_kinematics.extend([jet3.pt, jet3.eta, jet3.phi, jet3.mass])
         else:
             jet_kinematics.extend([0., 0., 0., 0.])
 
         
         #maximum deepcsv from top 2 subjets of the fatjet
         jet1_btag = jet2_btag = -1.
+
+        jet1_btag = jet1.btagDeepB
+        jet2_btag = jet2.btagDeepB
         
-        if(jet1.subJetIdx1 >= 0):
-            jet1_btag = subjets[jet1.subJetIdx1].btagDeepB
-        if(jet1.subJetIdx2 >= 0):
-            jet1_btag = max(jet1_btag, subjets[jet1.subJetIdx2].btagDeepB)
-
-        if(jet2.subJetIdx1 >= 0):
-            jet2_btag = subjets[jet2.subJetIdx1].btagDeepB
-        if(jet2.subJetIdx2 >= 0):
-            jet2_btag = max(jet2_btag, subjets[jet2.subJetIdx2].btagDeepB)
-
-        jet1_extraInfo = [jet1.tau1, jet1.tau2, jet1.tau3, jet1.tau4, jet1.lsf3, jet1_btag, jet1.nPFConstituents]
-        jet2_extraInfo = [jet2.tau1, jet2.tau2, jet2.tau3, jet2.tau4, jet2.lsf3, jet2_btag, jet2.nPFConstituents]
+        jet1_extraInfo = [jet1_btag, jet1.nPFConstituents]
+        jet2_extraInfo = [jet2_btag, jet2.nPFConstituents]
         #print(jet1.PFConstituents_Start, jet1.PFConstituents_Start + jet1.nPFConstituents, jet2.PFConstituents_Start, jet2.PFConstituents_Start + jet2.nPFConstituents)
 
         j1_nPF = min(self.n_pf_cands, jet1.nPFConstituents)
@@ -518,9 +511,9 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
     elif (year == 2016.5):
         triggers = ["HLT_PFHT900", "HLT_PFJet450", "HLT_AK8PFJet450"]
     elif(year == 2017):
-        triggers = ["HLT_PFHT1050", "HLT_AK8PFJet500"]
+        triggers = ["HLT_PFHT1050", "HLT_AK8PFJet500", "HLT_PFJet550"]
     elif(year == 2018):
-        triggers = ["HLT_PFHT1050", "HLT_AK8PFJet500"]
+        triggers = ["HLT_PFHT1050", "HLT_AK8PFJet500", "HLT_PFJet550"]
     else:
         print("Invalid year option of %i. Year must be 2016, 2017, or 2018! \n" % year)
         exit(1)
@@ -534,7 +527,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
                 'HLT_AK8PFJet500'
                 ]
 
-    mjj_cut = 1200.
+    mjj_cut = 0.
     
     nFiles = len(inputFileNames)
     print("Will run over %i files and output to %s with truth label %i" % (nFiles, outputFileName, process_flag))
@@ -619,16 +612,13 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
 
 
 
-            PFCands = Collection(event, "FatJetPFCands")
+            PFCands = Collection(event, "JetPFCands")
                         
-            try:
-                mytest = event.FatJetPFCands_eta
-            except:
-                FullPFCands = Collection(event, "PFCands")
-                for cand in PFCands:
-                    cand.eta = FullPFCands[cand.pFCandsIdx].eta
-                    cand.phi = FullPFCands[cand.pFCandsIdx].phi
-                    cand.mass = FullPFCands[cand.pFCandsIdx].mass
+            FullPFCands = Collection(event, "PFCands")
+            for cand in PFCands:
+                cand.eta = FullPFCands[cand.pFCandsIdx].eta
+                cand.phi = FullPFCands[cand.pFCandsIdx].phi
+                cand.mass = FullPFCands[cand.pFCandsIdx].mass
             
             AK8Jets = Collection(event, "FatJet")
             AK4Jets = Collection(event, "Jet")
@@ -639,37 +629,34 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
                 
 
 
-            jet_min_pt = 300
+            jet_min_pt = 20
             #keep 2 jets with pt > 200, tight id
             jet1 = jet2 = jet3 =  None
         
             pf_conts_start = 0 #keep track of indices for PF candidates
             jet_index = 0
             num_jets = 0
-            for i,jet in enumerate(AK8Jets):
+            for i,jet in enumerate(AK4Jets):
                 jet.idx = i
                 #jetId : bit1 = loose, bit2 = tight, bit3 = tightLepVeto
                 #want tight id
                 #select highest two pt jets, keep track of 3rd
                 if((jet.jetId & 2 == 2) and abs(jet.eta) < 2.5):
                     jet.PFConstituents_Start = pf_conts_start
-                    if(jet.pt > 50): num_jets+=1
-                    if((jet1 == None or jet.pt > jet1.pt and jet.pt > 50.)):
+                    if(jet.pt > 30): num_jets+=1
+                    if((jet1 == None or jet.pt > jet1.pt and jet.pt > 30.)):
                         jet3 = jet2
                         jet2 = jet1
                         jet1 = jet
-                    elif((jet2 == None or jet.pt > jet2.pt and jet.pt > 50.)):
+                    elif((jet2 == None or jet.pt > jet2.pt and jet.pt > 30.)):
                         jet3 = jet2
                         jet2 = jet
                     elif(jet3 == None or jet.pt > jet3.pt):
                         jet3 = jet
                 
                 
-                try:
-                    pf_conts_start += jet.nPFConstituents # try/except needed because FatJet_nPFConstituents isn't stored when using PFNano
-                except:
-                    jet.nPFConstituents = nPFCounter(jet_index, event)
-                    pf_conts_start += jet.nPFConstituents
+                jet.nPFConstituents = nPFCounter(jet_index, event)
+                pf_conts_start += jet.nPFConstituents
                 
                 jet_index += 1
             
@@ -679,15 +666,9 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             if(jet1 == None or jet2 == None): continue
             if(inHEMRegion(jet1, year) or inHEMRegion(jet2, year)): continue
 
-            #Order jets so jet1 is always the higher mass one
-            if(jet1.msoftdrop < jet2.msoftdrop):
-                temp = jet1
-                jet1 = jet2
-                jet2 = temp
 
-
-            jet1_4vec = ROOT.Math.PtEtaPhiMVector(jet1.pt, jet1.eta, jet1.phi, jet1.msoftdrop)
-            jet2_4vec = ROOT.Math.PtEtaPhiMVector(jet2.pt, jet2.eta, jet2.phi, jet2.msoftdrop)
+            jet1_4vec = ROOT.Math.PtEtaPhiMVector(jet1.pt, jet1.eta, jet1.phi, jet1.mass)
+            jet2_4vec = ROOT.Math.PtEtaPhiMVector(jet2.pt, jet2.eta, jet2.phi, jet2.mass)
 
 
             dijet = jet1_4vec + jet2_4vec
@@ -703,7 +684,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
                 if(dijet_idx1 != jet1.idx or dijet_idx2 != jet2.idx):
                     print("Dijet indices from TIMBER and this selector don't match!")
                     print("TIMBER : %i %i. This : %i %i " %(dijet_idx1, dijet_idx2, jet1.idx, jet2.idx))
-                    print(jet1.msoftdrop, jet2.msoftdrop)
+                    print(jet1.m, jet2.m)
                     sys.exit(1)
 
 
