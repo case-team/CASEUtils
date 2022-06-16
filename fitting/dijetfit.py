@@ -127,14 +127,27 @@ def dijetfit(options):
     fine_bin_size = 4
     mass = options.mass 
 
-    binsx = [1530, 1607, 1687, 1770, 1856, 1945, 2037, 2132, 2231, 2332, 2438,
+    binsx = [1460, 1530, 1607, 1687, 1770, 1856, 1945, 2037, 2132, 2231, 2332, 2438,
              2546, 2659, 2775, 2895, 3019, 3147, 3279, 3416, 3558, 3704, 3854,
              4010, 4171, 4337, 4509, 4686, 4869, 5058, 5253, 5500, 5663, 5877,
              6099, 6328, 6564, 6808]
 
+    if(options.mjj_min > 0 and options.mjj_min < binsx[-1]):
+        start_idx = 0
+        while(binsx[start_idx] < options.mjj_min):
+            start_idx +=1
+        binsx = binsx[start_idx:]
+
+        if(abs(options.mjj_min - binsx[0]) < 50.):
+            binsx[0] = options.mjj_min
+        else:
+            binsx.insert(0, options.mjj_min)
+        print("Will start fit from %.0f GeV" % binsx[0])
+
     # round to smallest precision we are storing mass values with, otherwise
     # get weird effects related to bin size
     roundTo(binsx, fine_bin_size)
+
 
     roobins = ROOT.RooBinning(len(binsx)-1, array('d', binsx), "mjjbins")
     bins_fine = int(binsx[-1] - binsx[0])/fine_bin_size
@@ -382,8 +395,10 @@ def dijetfit(options):
         ).format(mass=mass, l1=label, l2=sb_label)
     print(cmd)
     os.system(cmd)
-    checkSBFit('workspace_JJ_{l1}_{l2}.root'.format(l1=label, l2=sb_label),
+    sbfit_chi2, sbfit_ndof = checkSBFit('workspace_JJ_{l1}_{l2}.root'.format(l1=label, l2=sb_label),
                sb_label, roobins, label + "_" + sb_label, nPars_QCD, plot_dir)
+
+    sbfit_prob = ROOT.TMath.Prob(sbfit_chi2, sbfit_ndof)
 
     f_signif_name = ('higgsCombinesignificance_{l1}_{l2}.'
                      + 'Significance.mH{mass:.0f}.root'
@@ -405,7 +420,8 @@ def dijetfit(options):
     res2 = f_limit.Get("limit")
     eps = 0.01
     obs_limit = -1
-    exp_limit = -1
+    exp_limit = exp_low = exp_high = exp_two_low = exp_two_high = -1
+    
     for i in range(6):
         res2.GetEntry(i)
         if(res2.quantileExpected == -1):  # obs limit
@@ -439,9 +455,12 @@ def dijetfit(options):
     results = dict()
 
     # QCD fit results
-    results['chi2'] = chi2s[best_i]
-    results['ndof'] = ndofs[best_i]
-    results['fit_prob'] = probs[best_i]
+    results['bkgfit_chi2'] = chi2s[best_i]
+    results['bkgfit_ndof'] = ndofs[best_i]
+    results['bkgfit_prob'] = probs[best_i]
+    results['sbfit_chi2'] = sbfit_chi2
+    results['sbfit_ndof'] = sbfit_ndof
+    results['sbfit_prob'] = sbfit_prob
     results['nPars_QCD'] = nPars_QCD
     results['signif'] = signif
     results['pval'] = pval
@@ -453,6 +472,7 @@ def dijetfit(options):
     results['exp_lim_2sig_high'] = exp_two_high* sig_norm
     results['sig_norm_unc'] = options.sig_norm_unc
     results['mass'] = options.mass
+    results['mjj_min'] = options.mjj_min
 
     print("Saving fit results to %s" % plot_dir + "fit_results_{}.pkl".format(options.mass))
     with open(plot_dir + "fit_results_{}.pkl".format(options.mass), "w") as f:
@@ -467,6 +487,8 @@ def dijetfit(options):
 
 def fitting_options():
     parser = optparse.OptionParser()
+    parser.add_option("--mjj_min", type=float, default=-1.0,
+                      help="Minimum mjj for the fit")
     parser.add_option("--sig_norm", type=float, default=1.0,
                       help="Scale signal pdf normalization by this amount")
     parser.add_option("-s", "--sig_shape", default="signal_shape_m2500.root",

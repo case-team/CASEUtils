@@ -73,7 +73,7 @@ else:
             del fin['j2_images']
     fout = fin
 
-total_size = fout[fout.keys()[0]].shape[0]
+total_size = fout['jet1_PFCands'].shape[0]
 iters = int(math.ceil(float(total_size)/batch_size))
 
 print("going to make jet images for %i events with batch size %i (%i batches) \n \n" % (total_size, batch_size, iters))

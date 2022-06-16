@@ -422,12 +422,13 @@ def checkSBFit(filename,label,roobins,plotname, nPars, plot_dir):
     frame3.addPlotable(hpull,"X0 P E1")
     
     data.plotOn(frame,ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson), ROOT.RooFit.Binning(roobins),ROOT.RooFit.Name("data_obs"),ROOT.RooFit.XErrorSize(0))
-    chi2,ndof = calculateChi2(hpull, nPars)
+    chi2,ndof = calculateChi2(hpull, nPars +1)
 
     pdf_names = ["model_s"] 
-    PlotFitResults(frame,fres.GetName(),nPars,frame3,"data_obs", pdf_names,chi2,ndof,'sbFit_'+plotname, plot_dir, has_sig = True)
+    PlotFitResults(frame,fres.GetName(),nPars+1,frame3,"data_obs", pdf_names,chi2,ndof,'sbFit_'+plotname, plot_dir, has_sig = True)
 
     print "chi2,ndof are", chi2, ndof
+    return chi2, ndof
 
 
 def f_test(nParams, nDof, chi2, thresh = 0.05):
