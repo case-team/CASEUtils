@@ -72,7 +72,7 @@ def fitting_options():
                         Must have same length as mass list""")
     parser.add_argument("-o", "--outDir", dest="outDir", default='plots/',
                         help="Where to store output files")
-    parser.add_argument("--dcbModel", dest="dcbModel", action="store_true",
+    parser.add_argument("--dcb-model", "--dcbModel", dest="dcbModel", action="store_true",
                         default=False,
                         help="Whether or not to use double crystal ball model")
     parser.add_argument("--fitRange", dest="fitRange", type = float, default=0.2,

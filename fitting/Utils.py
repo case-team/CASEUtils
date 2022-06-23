@@ -219,7 +219,7 @@ def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvn
     c1.SaveAs(plot_dir + canvname)
     #c1.SaveAs(canvname.replace("png","C"),"C")
 
-def calculateChi2(g_pulls, nPars, ranges = None):
+def calculateChi2(g_pulls, nPars, ranges = None, excludeZeros = True, dataHist = None):
      
     NumberOfVarBins = 0
     NumberOfObservations_VarBin = 0
@@ -228,6 +228,8 @@ def calculateChi2(g_pulls, nPars, ranges = None):
 
     a_x = array('d', [0.])
     a_val = array('d', [0.])
+    a_data = array('d', [0.])
+    already_zero = False
     for p in range (0,g_pulls.GetN()):
     
         g_pulls.GetPoint(p, a_x, a_val)
@@ -243,6 +245,14 @@ def calculateChi2(g_pulls, nPars, ranges = None):
                 if(x >= range_[0] and x<= range_[1]):
                     add = True
          
+        if(excludeZeros and dataHist is not None):
+            dataHist.GetPoint(p, a_x, a_data)
+            if(a_data[0] <= 0.):
+                #print("Data %.0f for x = %.0f" % (a_data[0], a_x[0]))
+                #include 'first' zero point, exclude rest
+                if(already_zero): add = False
+                else: already_zero = True
+
         if(add):
             NumberOfObservations_VarBin+=1
             chi2_VarBin += pow(pull,2)
@@ -333,7 +343,7 @@ def load_h5_bkg(h_file, hist, correctStats = False):
     fill_hist(mjj[mask], hist, event_num)
 
 
-def load_h5_sig(h_file, hist, sig_mjj, correctStats =False):
+def load_h5_sig(h_file, hist, sig_mjj, requireWindow = False, correctStats =False, mixed = False):
     event_num = None
     with h5py.File(h_file, "r") as f:
         try:
@@ -342,7 +352,10 @@ def load_h5_sig(h_file, hist, sig_mjj, correctStats =False):
             mjj = f['mjj'][()]
 
         num_evts = mjj.shape[0]
-        is_sig = f['truth_label'][()].flatten()
+        if(mixed):
+            is_sig = f['truth_label'][()].flatten()
+        else: 
+            is_sig = np.ones_like(mjj)
 
 
         if(is_sig.shape[0] != mjj.shape[0]):
@@ -353,7 +366,8 @@ def load_h5_sig(h_file, hist, sig_mjj, correctStats =False):
             event_num = f['event_num'][()]
 
 
-    mask = (mjj > 0.8*sig_mjj) & (mjj < 1.2*sig_mjj) & (is_sig > 0.9)
+    if(requireWindow): mask = (mjj > 0.8*sig_mjj) & (mjj < 1.2*sig_mjj) & (is_sig > 0.9)
+    else: mask = mjj > 0.
     if(correctStats): event_num = event_num[mask]
     fill_hist(mjj[mask], hist, event_num)
 
@@ -422,7 +436,9 @@ def checkSBFit(filename,label,roobins,plotname, nPars, plot_dir):
     frame3.addPlotable(hpull,"X0 P E1")
     
     data.plotOn(frame,ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson), ROOT.RooFit.Binning(roobins),ROOT.RooFit.Name("data_obs"),ROOT.RooFit.XErrorSize(0))
-    chi2,ndof = calculateChi2(hpull, nPars +1)
+    dhist = ROOT.RooHist(frame.findObject('data_obs', ROOT.RooHist.Class()))
+    chi2, ndof = calculateChi2(hpull, nPars + 1, excludeZeros = True, dataHist = dhist)
+    #chi2,ndof = calculateChi2(hpull, nPars +1)
 
     pdf_names = ["model_s"] 
     PlotFitResults(frame,fres.GetName(),nPars+1,frame3,"data_obs", pdf_names,chi2,ndof,'sbFit_'+plotname, plot_dir, has_sig = True)

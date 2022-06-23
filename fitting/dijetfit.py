@@ -41,7 +41,7 @@ def fit_signalmodel(input_file, sig_file_name, mass, x_bins, fine_bins,
     histos_sig = ROOT.TH1F("mjj_sig", "mjj_sig",
                            len(bins_sig_fit) - 1, bins_sig_fit)
 
-    load_h5_sig(input_file, histos_sig, mass)
+    load_h5_sig(input_file, histos_sig, mass, requireWindow = False)
     sig_outfile = ROOT.TFile(sig_file_name, "RECREATE")
     fitter = Fitter(['mjj_fine'])
 
@@ -298,7 +298,10 @@ def dijetfit(options):
         hpull = frame.pullHist(data_name, model_name, useBinAverage)
         framePulls.addPlotable(hpull, "X0 P E1")
 
-        my_chi2, my_ndof = calculateChi2(hpull, nPars, ranges=chi2_range)
+        dhist = ROOT.RooHist(frame.findObject(data_name, ROOT.RooHist.Class()))
+
+
+        my_chi2, my_ndof = calculateChi2(hpull, nPars, ranges=chi2_range, excludeZeros = True, dataHist = dhist)
         my_prob = ROOT.TMath.Prob(my_chi2, my_ndof)
         PlotFitResults(frame, fres.GetName(), nPars, framePulls, data_name,
                        model_name, my_chi2, my_ndof,
@@ -448,7 +451,7 @@ def dijetfit(options):
     print("p-value is %.3f \n" % pval)
 
     # TODO: Comment back in
-    #check_rough_sig(options.inputFile, options.mass*0.9, options.mass*1.1)
+    check_rough_sig(options.inputFile, options.mass*0.9, options.mass*1.1)
     f_signif.Close()
     f_limit.Close()
     f_pval.Close()
