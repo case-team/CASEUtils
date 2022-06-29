@@ -1,6 +1,10 @@
 # H5 Maker
 
 Make h5's from the extended NanoAOD (pancakes) after applying a preselection. 
+To run locally, try something like `python make_h5_local.py -i input_file.root -o output_file.h5 -y 201X -f 0` 
+The option `-f` sets the truth label of the output. Usually signal is 1, QCD is 0, single top -1, ttbar -2, V+jets -3
+Use the `--sys` option if you are running on a signal and want to save the event weights for the systematic variation. 
+The options are described a bit in `make_h5_local.py`
 
 ## Preselection
 
