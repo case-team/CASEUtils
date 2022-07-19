@@ -7,7 +7,7 @@ Based on previous VAE [version](https://github.com/jngadiub/VAEDijetFit)
 
 Higgs combine tools is needed, either standalone or from cmssw. See [here](http://cms-analysis.github.io/HiggsAnalysis-CombinedLimit/) for instructions to get latest version.
 
-#How To
+### How To
 
 The main fitting code is `dijetfit.py`.
 It takes as input an h5 file with a branch of 'mjj', the dijet mass of events
