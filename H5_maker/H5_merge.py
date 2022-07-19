@@ -26,7 +26,7 @@ def merge(fin_name, fout_name):
 
     for key in copy.copy(fin_keys):
         if('_eff' in key or fin[key].shape[0] == 1):
-            print("Doing weighted avg for key %s" % key)
+            #print("Doing weighted avg for key %s" % key)
             fin_keys.remove(key)
             n_fin = float(fin[fin_keys[0]].shape[0])
             n_fout = float(fout[fin_keys[0]].shape[0])
@@ -35,7 +35,6 @@ def merge(fin_name, fout_name):
 
 
     for key in fin_keys:
-        print(key)
         utils.append_h5(fout, key, fin[key])
         
 
@@ -49,15 +48,15 @@ def my_copy(fin_name, fout_name):
     for key in fin_keys:
         shape = list(fin[key].shape)
         shape[0] = None
-        fout.create_dataset(key, data = fin[key], chunks = True, maxshape = shape, compression = 'gzip')
+        fout.create_dataset(key, data = fin[key], chunks = True, maxshape = shape, compression = fin[key].compression)
 
 
 
 def merge_multiple(fout_name, fs):
     print("Merging H5 files: ", fs)
     print("Dest %s" % fout_name)
-    os.system("cp %s %s" % (fs[0], fout_name))
-    #my_copy(fs[0], fout_name)
+    #os.system("cp %s %s" % (fs[0], fout_name))
+    my_copy(fs[0], fout_name)
     for fin_name in fs[1:]:
         print("Merging %s" % fin_name)
         merge(fin_name, fout_name)
