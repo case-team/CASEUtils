@@ -58,8 +58,28 @@ JME_vars_map = {
 
 
 
+def deltaEta(candidate,jet):
+    try:
+        deta = abs(candidate.Eta()-jet.eta)
+    except:
+        deta = abs(candidate.eta-jet.eta)
+    return deta
 
+def deltaPhi(candidate,jet):
+    try:
+        dphi = candidate.Phi()-jet.phi
+    except:
+        dphi = candidate.phi-jet.phi
+    if dphi < -1*np.pi:
+        dphi += 2*np.pi
+    elif dphi > np.pi:
+        dphi -= 2*np.pi
+    return dphi
 
+def deltaR(candidate,jet):
+    deta = deltaEta(candidate,jet)
+    dphi = deltaPhi(candidate,jet)
+    return np.sqrt(deta*deta+dphi*dphi)
 
 def nPFCounter(index, event):
     count = 0
@@ -106,8 +126,8 @@ class Outputer:
 
     def reset(self):
         self.idx = 0
-        self.jet1_PFCands = np.zeros((self.batch_size, self.n_pf_cands,4), dtype=np.float16)
-        self.jet2_PFCands = np.zeros((self.batch_size, self.n_pf_cands, 4), dtype=np.float16)
+        self.jet1_PFCands = np.zeros((self.batch_size, self.n_pf_cands,19), dtype=np.float16)
+        self.jet2_PFCands = np.zeros((self.batch_size, self.n_pf_cands, 19), dtype=np.float16)
         self.jet1_SVs = np.zeros((self.batch_size, self.n_SVs,6), dtype=np.float32)
         self.jet2_SVs = np.zeros((self.batch_size, self.n_SVs, 6), dtype=np.float32)
         self.jet1_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
@@ -143,6 +163,7 @@ class Outputer:
         sorted_idx = np.flip(np.argsort(pfcands_pt))
         pfcands = pfcands[sorted_idx]
         
+        #print(pfcands)
         return pfcands.astype(np.float16)
 
     def get_weight_avgs(self, inTree):
@@ -334,11 +355,13 @@ class Outputer:
         jet2_PFCands = []
         for idx in range1:
             cand = ROOT.Math.PtEtaPhiMVector(PFCands[idx].pt, PFCands[idx].eta, PFCands[idx].phi, PFCands[idx].mass)
-            jet1_PFCands.append([cand.Px(), cand.Py(), cand.Pz(), cand.E()])
+            #jet1_PFCands.append([cand.Px(), cand.Py(), cand.Pz(), cand.E()])
+            jet1_PFCands.append([cand.Px(), cand.Py(), cand.Pz(), cand.E(), PFCands[idx].d0, PFCands[idx].d0Err, PFCands[idx].dz, PFCands[idx].dzErr, PFCands[idx].puppiWeight, PFCands[idx].trkChi2, PFCands[idx].vtxChi2, PFCands[idx].charge, PFCands[idx].lostInnerHits, PFCands[idx].pdgId, PFCands[idx].pvAssocQuality, PFCands[idx].trkQuality, deltaEta(cand,jet1), deltaPhi(cand,jet1), deltaR(cand,jet1)])
 
         for idx in range2:
             cand = ROOT.Math.PtEtaPhiMVector(PFCands[idx].pt, PFCands[idx].eta, PFCands[idx].phi, PFCands[idx].mass)
-            jet2_PFCands.append([cand.Px(), cand.Py(), cand.Pz(), cand.E()])
+            #jet2_PFCands.append([cand.Px(), cand.Py(), cand.Pz(), cand.E()])
+            jet2_PFCands.append([cand.Px(), cand.Py(), cand.Pz(), cand.E(), PFCands[idx].d0, PFCands[idx].d0Err, PFCands[idx].dz, PFCands[idx].dzErr, PFCands[idx].puppiWeight, PFCands[idx].trkChi2, PFCands[idx].vtxChi2, PFCands[idx].charge, PFCands[idx].lostInnerHits, PFCands[idx].pdgId, PFCands[idx].pvAssocQuality, PFCands[idx].trkQuality, deltaEta(cand,jet2), deltaPhi(cand,jet2), deltaR(cand,jet2)])
 
         #SV's
         jet1_SVs = []
@@ -397,8 +420,8 @@ class Outputer:
                 f.create_dataset("jet_kinematics", data=self.jet_kinematics, chunks = True, maxshape=(None, self.jet_kinematics.shape[1]))
                 f.create_dataset("jet1_extraInfo", data=self.jet1_extraInfo, chunks = True, maxshape=(None, self.jet1_extraInfo.shape[1]))
                 f.create_dataset("jet2_extraInfo", data=self.jet2_extraInfo, chunks = True, maxshape=(None, self.jet2_extraInfo.shape[1]))
-                f.create_dataset("jet1_PFCands", data=self.jet1_PFCands, chunks = True, maxshape=(None, self.jet1_PFCands.shape[1], 4), compression='gzip')
-                f.create_dataset("jet2_PFCands", data=self.jet2_PFCands, chunks = True, maxshape=(None, self.jet2_PFCands.shape[1], 4), compression='gzip')
+                f.create_dataset("jet1_PFCands", data=self.jet1_PFCands, chunks = True, maxshape=(None, self.jet1_PFCands.shape[1], 19), compression='gzip')
+                f.create_dataset("jet2_PFCands", data=self.jet2_PFCands, chunks = True, maxshape=(None, self.jet2_PFCands.shape[1], 19), compression='gzip')
                 f.create_dataset("jet1_SVs", data=self.jet1_SVs, chunks = True, maxshape=(None, self.n_SVs, 6), compression='gzip')
                 f.create_dataset("jet2_SVs", data=self.jet2_SVs, chunks = True, maxshape=(None, self.n_SVs, 6), compression='gzip')
                 if(self.include_systematics):
@@ -617,27 +640,21 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
 
             if(not passTrigger): continue
 
+            ###
+            ### Leptons + Photons
+            ###
+            muons = Collection(event, "Muon")
+            electrons = Collection(event, "Electron")
+            photons = Collection(event, "Photon")
 
-
-            PFCands = Collection(event, "FatJetPFCands")
-                        
-            try:
-                mytest = event.FatJetPFCands_eta
-            except:
-                FullPFCands = Collection(event, "PFCands")
-                for cand in PFCands:
-                    cand.eta = FullPFCands[cand.pFCandsIdx].eta
-                    cand.phi = FullPFCands[cand.pFCandsIdx].phi
-                    cand.mass = FullPFCands[cand.pFCandsIdx].mass
             
+
+            ###
+            ### Jets
+            ###
             AK8Jets = Collection(event, "FatJet")
             AK4Jets = Collection(event, "Jet")
             subjets = Collection(event, "SubJet")
-
-
-
-                
-
 
             jet_min_pt = 300
             #keep 2 jets with pt > 200, tight id
@@ -652,6 +669,28 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
                 #want tight id
                 #select highest two pt jets, keep track of 3rd
                 if((jet.jetId & 2 == 2) and abs(jet.eta) < 2.5):
+
+                    badjet = False
+                    for m,muon in enumerate(muons):
+                        if muon.looseId and muon.pt > 40 and deltaR(muon,jet)<0.8:
+                            badjet = True
+                            break
+                    if badjet:
+                        continue
+                    for e,electron in enumerate(electrons):
+                        # https://twiki.cern.ch/twiki/bin/view/CMS/CutBasedElectronIdentificationRun2#Cut_Based_Electron_ID_for_Run_2
+                        if electron.mvaFall17V2Iso_WPL and electron.pt > 40 and deltaR(electron,jet)<0.8:
+                            badjet = True
+                            break
+                    if badjet:
+                        continue
+                    for p,photon in enumerate(photons):
+                        if (photon.cutBased & 2 == 2) and photon.pt > 40 and deltaR(photon,jet)<0.8:
+                            badjet = True
+                            break
+                    if badjet:
+                        continue
+                    
                     jet.PFConstituents_Start = pf_conts_start
                     if(jet.pt > 50): num_jets+=1
                     if((jet1 == None or jet.pt > jet1.pt and jet.pt > 50.)):
@@ -692,6 +731,32 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
 
             dijet = jet1_4vec + jet2_4vec
             mjj = dijet.M()
+
+            ###
+            ### PF candidates
+            ###
+            PFCands = Collection(event, "FatJetPFCands")
+                        
+            try:
+                mytest = event.FatJetPFCands_eta
+            except:
+                FullPFCands = Collection(event, "PFCands")
+                for cand in PFCands:
+                    cand.eta = FullPFCands[cand.pFCandsIdx].eta
+                    cand.phi = FullPFCands[cand.pFCandsIdx].phi
+                    cand.mass = FullPFCands[cand.pFCandsIdx].mass
+                    cand.d0 = FullPFCands[cand.pFCandsIdx].d0
+                    cand.d0Err = FullPFCands[cand.pFCandsIdx].d0Err
+                    cand.dz = FullPFCands[cand.pFCandsIdx].dz
+                    cand.dzErr = FullPFCands[cand.pFCandsIdx].dzErr
+                    cand.puppiWeight = FullPFCands[cand.pFCandsIdx].puppiWeight
+                    cand.trkChi2 = FullPFCands[cand.pFCandsIdx].trkChi2
+                    cand.vtxChi2 = FullPFCands[cand.pFCandsIdx].vtxChi2
+                    cand.charge = FullPFCands[cand.pFCandsIdx].charge
+                    cand.lostInnerHits = FullPFCands[cand.pFCandsIdx].lostInnerHits
+                    cand.pdgId = FullPFCands[cand.pFCandsIdx].pdgId
+                    cand.pvAssocQuality = FullPFCands[cand.pFCandsIdx].pvAssocQuality
+                    cand.trkQuality = FullPFCands[cand.pFCandsIdx].trkQuality
 
 
 
