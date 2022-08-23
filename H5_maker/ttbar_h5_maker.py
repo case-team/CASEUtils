@@ -1,7 +1,7 @@
 # Read nanoAOD with PF constituents (aka pancakes), apply a pre-selection and output to an H5 file format
 from H5_maker import *
 from array import array
-import correctionlib
+from correction_utils import *
 
 
 
@@ -36,7 +36,7 @@ def rel_pt(mu, jet):
 
 class Outputer_TTbar(Outputer):
     def __init__(self, outputFileName="out.root", batch_size = 5000, truth_label = 0, sample_type="MC", 
-            sort_pfcands = False, include_systematics = True, do_top_ptrw = False, year = 2017):
+            sort_pfcands = False, include_systematics = True, do_top_ptrw = False, year = "2018"):
 
         self.batch_size = batch_size
         self.output_name = outputFileName
@@ -61,8 +61,9 @@ class Outputer_TTbar(Outputer):
         self.btag_jet_info = np.zeros((self.batch_size, 5), dtype=np.float32)
         self.mu_info = np.zeros((self.batch_size, 4), dtype=np.float32)
         self.event_info = np.zeros((self.batch_size, 6), dtype=np.float32)
-        self.sys_weights = np.zeros((self.batch_size, 21), dtype=np.float32)
+        self.sys_weights = np.zeros((self.batch_size, 25), dtype=np.float32)
         self.jet1_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
+        self.gen_parts = np.zeros((self.batch_size, 25), dtype=np.float32)
 
 
     
@@ -80,7 +81,7 @@ class Outputer_TTbar(Outputer):
         run = inTree.readBranch('run')
         subjets = Collection(event, "SubJet")
         PFCands = list(Collection(event, "PFCands"))
-        PFCandsIdxs = list(Collection(event, "FatJetToPFCands"))
+        PFCandsIdxs = list(Collection(event, "FatJetPFCands"))
 
         #try:
         #    mytest = event.FatJetPFCands_eta
@@ -100,29 +101,68 @@ class Outputer_TTbar(Outputer):
 
         sys_weights = []
         jet1_JME_vars = []
+
+        gen_parts = np.zeros(self.gen_parts.shape[1], dtype = np.float32)
         if(self.include_systematics):
+
+            #JME corrections
+            jet1.pt_corr = inTree.readBranch("FatJet_pt_nom")[jet1.idx]
+            jet1.msoftdrop_corr = inTree.readBranch("FatJet_msoftdrop_nom")[jet1.idx]
+
+
+            #JME systematics
+            jet1_pt_JES_up = inTree.readBranch("FatJet_pt_jesTotalUp")[jet1.idx]
+            jet1_msoftdrop_JES_up = inTree.readBranch("FatJet_msoftdrop_jesTotalUp")[jet1.idx]
+
+            jet1_pt_JES_down = inTree.readBranch("FatJet_pt_jesTotalDown")[jet1.idx]
+            jet1_msoftdrop_JES_down = inTree.readBranch("FatJet_msoftdrop_jesTotalDown")[jet1.idx]
+
+
+            jet1_pt_JER_up = inTree.readBranch("FatJet_pt_jerUp")[jet1.idx]
+            jet1_msoftdrop_JER_up = inTree.readBranch("FatJet_msoftdrop_jerUp")[jet1.idx]
+
+            jet1_pt_JER_down = inTree.readBranch("FatJet_pt_jerDown")[jet1.idx]
+            jet1_msoftdrop_JER_down = inTree.readBranch("FatJet_msoftdrop_jerDown")[jet1.idx]
+
+
+            jet1_msoftdrop_JMS_up = inTree.readBranch("FatJet_msoftdrop_jmsUp")[jet1.idx]
+            jet1_msoftdrop_JMS_down = inTree.readBranch("FatJet_msoftdrop_jmsDown")[jet1.idx]
+
+            jet1_msoftdrop_JMR_up = inTree.readBranch("FatJet_msoftdrop_jmrUp")[jet1.idx]
+            jet1_msoftdrop_JMR_down = inTree.readBranch("FatJet_msoftdrop_jmrDown")[jet1.idx]
+
+
+
+            jet1.JME_vars = [jet1_pt_JES_up, jet1_msoftdrop_JES_up, jet1_pt_JES_down, jet1_msoftdrop_JES_down, 
+                           jet1_pt_JER_up, jet1_msoftdrop_JER_up, jet1_pt_JER_down, jet1_msoftdrop_JER_down,
+                           jet1_msoftdrop_JMS_up, jet1_msoftdrop_JMS_down, jet1_msoftdrop_JMR_up, jet1_msoftdrop_JMR_down]
+
+
+
+
+            mu_weights =  get_lepton_weights(sel_mu, self.year)
+            #print(sel_mu.pt, sel_mu.eta, mu_weights)
             #These branches are not in the regualr PFNano/Pancakes should have been added by TIMBER
 
             #PDF's
-            pdf_up = self.normed_weight(inTree, 'Pdfweight__up')
-            pdf_down = self.normed_weight(inTree, 'Pdfweight__down')
+            pdf_up, pdf_down = get_pdf_weight(inTree)
             
             #Prefire
-            if(self.year == 2016 or self.year == 2017):
-                prefire_nom = self.normed_weight(inTree, 'Prefire__nom')
-                prefire_up = self.normed_weight(inTree, 'Prefire__up') / prefire_nom
-                prefire_down = self.normed_weight(inTree, 'Prefire__down') / prefire_nom
+            if("2016" in self.year or "2017" in self.year):
+                prefire_nom = inTree.readBranch("L1PreFiringWeight_Nom")
+                prefire_up = inTree.readBranch("L1PreFiringWeight_Up")
+                prefire_down = inTree.readBranch("L1PreFiringWeight_Dn")
             else:
                 prefire_nom = prefire_up = prefire_down = 1.0
 
             #Pileup
-            pileup_nom = self.normed_weight(inTree, 'Pileup__nom')
-            pileup_up = self.normed_weight(inTree, 'Pileup__up') / pileup_nom
-            pileup_down = self.normed_weight(inTree, 'Pileup__down') / pileup_nom
+            pileup_nom, pileup_up, pileup_down = get_pileup_weight(self.year, inTree.readBranch("Pileup_nTrueInt"))
 
-            btag_nom =  self.normed_weight(inTree, 'lead_sjbtag_corr__nom') * self.normed_weight(inTree, 'sublead_sjbtag_corr__nom')
-            btag_up =  self.normed_weight(inTree, 'lead_sjbtag_corr__up') * self.normed_weight(inTree, 'sublead_sjbtag_corr__up') / btag_nom
-            btag_down =  self.normed_weight(inTree, 'lead_sjbtag_corr__down') * self.normed_weight(inTree, 'sublead_sjbtag_corr__down') / btag_nom
+            btag_nom = btag_up = btag_down = 1.0
+            btag_nom = inTree.readBranch("Jet_btagSF_deepcsv_M") [jet1.idx]
+            btag_up = inTree.readBranch("Jet_btagSF_deepcsv_M_up")[jet1.idx] / btag_nom
+            btag_down = inTree.readBranch("Jet_btagSF_deepcsv_M_down")[jet1.idx] / btag_nom
+
 
             #PS weights
             #Older samples don't have
@@ -164,26 +204,47 @@ class Outputer_TTbar(Outputer):
 
             top_ptrw_nom = top_ptrw_up = top_ptrw_down = 1.0
             if(self.do_top_ptrw):
-                top_ptrw_nom = inTree.readBranch("TptReweight__nom")
-                top_ptrw_up = inTree.readBranch("TptReweight__up") / top_ptrw_nom
-                top_ptrw_down = inTree.readBranch("TptReweight__down") / top_ptrw_nom
-                self.top_weights.append(top_ptrw_nom)
+                
+                #save gen particles
+                top, anti_top, W, anti_W, quark, anti_quark, b_quark = get_ttbar_gen_parts(event)
+                top_ptrw_nom, top_ptrw_up, top_ptrw_down = get_top_ptrw(event, top, anti_top)
+
+                #print(top, anti_top, W, anti_W, quark, anti_quark, b_quark)
+
+                gen_parts = [top.pt, top.eta, top.phi, top.mass, 
+                             anti_top.pt, anti_top.eta, anti_top.phi, anti_top.mass, 
+                             W.pt, W.eta, W.phi, W.mass, 
+                             anti_W.pt, anti_W.eta, anti_W.phi, anti_W.mass]
+
+                #add quarks and b if they were found
+                if(quark is not None and anti_quark is not None):
+                    gen_parts += [quark.pt, quark.eta, quark.phi, anti_quark.pt, anti_quark.eta, anti_quark.phi] 
+                else: gen_parts += [0.]*6
+                if(b_quark is not None): gen_parts += [b_quark.pt, b_quark.eta, b_quark.phi]
+                else: gen_parts += [0.]*3
+
+                gen_parts = np.array(gen_parts, dtype = np.float32)
+
+                #print(gen_parts)
+
+                
 
 
 
 
 
 
-            gen_weight = prefire_nom * pileup_nom * btag_nom * top_ptrw_nom
+            gen_weight = prefire_nom * pileup_nom * btag_nom * top_ptrw_nom * mu_weights["nominal"]
             sys_weights = [gen_weight, pdf_up, pdf_down, prefire_up, prefire_down, pileup_up, pileup_down, btag_up, btag_down, 
-            PS_ISR_up, PS_ISR_down, PS_FSR_up, PS_FSR_down, F_up, F_down, R_up, R_down, RF_up, RF_down, top_ptrw_up, top_ptrw_down]
+                            PS_ISR_up, PS_ISR_down, PS_FSR_up, PS_FSR_down, F_up, F_down, R_up, R_down, RF_up, RF_down, top_ptrw_up, top_ptrw_down,
+                            mu_weights['trigger_up'], mu_weights['trigger_down'], mu_weights['id_up'], mu_weights['id_down']]
+            #print(sys_weights)
 
-            test = event.lead_sjbtag_corr__vec
 
             #clip extreme variations
             self.sys_weights[self.idx] = np.clip(np.array(sys_weights, dtype=np.float32), 1e-3, 1e3)
 
-            self.jet1_JME_vars[self.idx] = jet1.JME_vars
+            #self.jet1_JME_vars[self.idx] = jet1.JME_vars
 
 
             
@@ -208,7 +269,7 @@ class Outputer_TTbar(Outputer):
 
         jet1_PFCands = []
         for i,conv in enumerate(range1):
-            idx = conv.candIdx
+            idx = conv.pFCandsIdx
             if(i > j1_nPF): break
             cand = ROOT.Math.PtEtaPhiMVector(PFCands[idx].pt, PFCands[idx].eta, PFCands[idx].phi, PFCands[idx].mass)
             jet1_PFCands.append([cand.Px(), cand.Py(), cand.Pz(), cand.E()])
@@ -221,6 +282,7 @@ class Outputer_TTbar(Outputer):
         self.jet1_extraInfo[self.idx] = np.array(jet1_extraInfo, dtype = np.float32)
         self.mu_info[self.idx] = np.array(mu_info, dtype = np.float32)
         self.btag_jet_info[self.idx] = np.array(btag_jet_info, dtype = np.float32)
+        self.gen_parts[self.idx] = gen_parts
         
         # sort PFCands by pt
         if self.sort_pfcands:
@@ -253,6 +315,8 @@ class Outputer_TTbar(Outputer):
                 if(self.include_systematics):
                     f.create_dataset("sys_weights", data=self.sys_weights, chunks = True, maxshape=(None, self.sys_weights.shape[1]))
                     f.create_dataset("jet1_JME_vars", data=self.jet1_JME_vars, chunks = True, maxshape=(None, self.jet1_JME_vars.shape[1]))
+                    if(self.do_top_ptrw):
+                        f.create_dataset("gen_parts", data=self.gen_parts, chunks = True, maxshape=(None, self.gen_parts.shape[1]), compression='gzip')
 
         else:
             with h5py.File(self.output_name, "a") as f:
@@ -266,6 +330,8 @@ class Outputer_TTbar(Outputer):
                 if(self.include_systematics):
                     utils.append_h5(f,'sys_weights',self.sys_weights)
                     utils.append_h5(f,'jet1_JME_vars',self.jet1_JME_vars)
+                    if(self.do_top_ptrw):
+                        utils.append_h5(f, 'gen_parts', self.gen_parts)
 
         self.reset()
 
@@ -281,6 +347,7 @@ class Outputer_TTbar(Outputer):
             if(self.include_systematics):
                 self.sys_weights = self.sys_weights[:self.idx]
                 self.jet1_JME_vars = self.jet1_JME_vars[:self.idx]
+                self.gen_parts = self.gen_parts[:self.idx]
 
         self.write_out()
         self.preselection_eff = eff
@@ -312,6 +379,7 @@ class Outputer_TTbar(Outputer):
                 cur_weights = f['sys_weights'][:]
                 normed_weights = np.copy(cur_weights[:])
                 weight_avg = np.mean(cur_weights, axis = 0)
+                print("Weight avg:")
                 print(weight_avg)
 
                 #renormalize so nominal weight avgs to 1, change preselection eff
@@ -327,14 +395,14 @@ class Outputer_TTbar(Outputer):
                 f['preselection_eff_JER_up'][0] *= nom_weight_avg
                 f['preselection_eff_JER_down'][0] *= nom_weight_avg
 
-                if(self.do_top_ptrw):
-                    avg_top_ptrw = np.mean(self.top_weights)
-                    f.create_dataset("top_ptrw_avg", data=np.array([avg_top_ptrw]))
+                #if(self.do_top_ptrw):
+                    #avg_top_ptrw = np.mean(self.top_weights)
+                    #f.create_dataset("top_ptrw_avg", data=np.array([avg_top_ptrw]))
 
 
 
 
-def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="out.root", json = '', year = 2016, nEventsMax = -1, sampleType = "MC", 
+def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="out.root", json = '', year = "2018", nEventsMax = -1, sampleType = "MC", 
         sort_pfcands=True,  include_systematics = False, do_top_ptrw = False):
     
     if not ((sampleType == "MC") or (sampleType=="data")):
@@ -351,11 +419,11 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
     #"Flag_BadPFMuonDzFilter",
     "Flag_eeBadScFilter", 
     ]
-    if((year == 2016) or (year == 2016.5)): filters.append("Flag_CSCTightHaloFilter")
-    if(year == 2017 or year == 2018): filters.append("Flag_ecalBadCalibFilter")
+    if("2016" in year ): filters.append("Flag_CSCTightHaloFilter")
+    if("2017" in year or "2018" in year): filters.append("Flag_ecalBadCalibFilter")
 
     triggers = ["HLT_Mu50"]
-    if(year == 2017 or year == 2018):
+    if("2017" in year or "2018" in year):
         triggers += ["HLT_TkMu100", "HLT_OldMu100"]
     else:
         triggers += ["HLT_TkMu50"]
@@ -363,10 +431,10 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
     btag_cut = -1.
 
     #deepcsv medium WP's https://twiki.cern.ch/twiki/bin/viewauth/CMS/BtagRecommendation
-    if(year == 2018): btag_cut = 0.4168
-    elif(year == 2017): btag_cut = 0.4506
-    elif(year == 2016): btag_cut = 0.5847 #postVFP
-    #elif(year == 2016APV): btag_cut = 0.6001 #preVFP
+    if("2018" in year): btag_cut = 0.4168
+    elif("2017" in year): btag_cut = 0.4506
+    elif("2016APV" in year): btag_cut = 0.6001 #preVFP
+    elif("2016" in year): btag_cut = 0.5847 #postVFP
 
 
 
@@ -380,8 +448,6 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
     out = Outputer_TTbar(outputFileName, truth_label =  process_flag, sample_type=sampleType, sort_pfcands=sort_pfcands, 
             include_systematics = include_systematics, year = year, do_top_ptrw = do_top_ptrw)
 
-    if(include_systematics):
-        out.get_weight_avgs(inTree)
 
 
 #----------------- Begin loop over files ---------------------------------
@@ -414,6 +480,8 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
             inTree= InputTree(TTree) 
             print('Running over %i entries \n' % nTotal)
 
+        if(include_systematics):
+            out.get_weight_avgs(inTree, ttbar = True)
 
 
         # Grab event tree from nanoAOD
@@ -426,7 +494,7 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
 # -------- Begin Loop over tree-------------------------------------
 
         entries = inTree.entries
-        for entry in xrange(entries):
+        for entry in range(entries):
 
 
             if count % 10000 == 0 :
@@ -523,7 +591,8 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
 
             for i,jet in enumerate(AK8Jets):
                 jet.pf_cands_start = pf_cands_start
-                pf_cands_start += jet.nPFCand
+                #pf_cands_start += jet.nPFCand
+                pf_cands_start += jet.nConstituents
                 jet.idx = i
                 #jetId : bit1 = loose, bit2 = tight, bit3 = tightLepVeto
                 #want tight id
@@ -533,7 +602,7 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
                     if((j1_ak8 is None or jet.pt > j1_ak8.pt) and jet.pt > 50. and ang_dist(jet.phi, sel_mu.phi) > ang_cut):
                         j1_ak8 = jet
                 
-                    jet.nPFConstituents = jet.nPFCand
+                    jet.nPFConstituents = jet.nConstituents
                 
                 jet_index += 1
             
@@ -573,8 +642,8 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
             print("Eff JES_down %.3f " % f['preselection_eff_JES_down'][0] )
             print("Eff JER_up %.3f " % f['preselection_eff_JER_up'][0])
             print("Eff JER_down %.3f " % f['preselection_eff_JER_down'][0] )
-            if(do_top_ptrw):
-                print("Avg top pt rewight %.3f " % f['top_ptrw_avg'][0])
+            #if(do_top_ptrw):
+                #print("Avg top pt rewight %.3f " % f['top_ptrw_avg'][0])
                 
 
     print("Outputed to %s" % outputFileName)

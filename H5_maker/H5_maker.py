@@ -72,7 +72,7 @@ def nPFCounter(index, event):
     return count
 
 def inHEMRegion(jet, year):
-    if(year == 2018):
+    if(year == 2018 or "2018" in year):
         return jet.eta > -3.2 and jet.eta < -1.3 and jet.phi  > -1.57 and jet.phi < -0.87
     else: return False
 
@@ -145,24 +145,35 @@ class Outputer:
         
         return pfcands.astype(np.float16)
 
-    def get_weight_avgs(self, inTree):
+    def get_weight_avgs(self, inTree, ttbar = False):
         #avg across whole sample (before preselection), allows effect on preselection efficiency to be accounted for
         ROOT.gROOT.SetBatch(True)
 
         self.avg_weights = dict()
 
-        sys_branch_names = ["Pileup__nom", "Pileup__up", "Pileup__down", 
-                "lead_sjbtag_corr__nom",  "lead_sjbtag_corr__up",  "lead_sjbtag_corr__down",  "sublead_sjbtag_corr__nom",  "sublead_sjbtag_corr__up",  "sublead_sjbtag_corr__down",  
-                "Pdfweight__up", "Pdfweight__down", 
-                "PSWeight[0]",  "PSWeight[1]", "PSWeight[2]", "PSWeight[3]",
-                ]
+        if(not ttbar):
 
-        #read number of scale variations
-        event = Event(inTree, 0)
-        nLHEScale = inTree.readBranch("nLHEScaleWeight")
-        for i in range(nLHEScale): sys_branch_names.append("LHEScaleWeight[%i]" % i)
-        if(self.year == 2016 or self.year == 2017):
-            sys_branch_names += ['Prefire__nom', 'Prefire__up', 'Prefire__down']
+            sys_branch_names = ["Pileup__nom", "Pileup__up", "Pileup__down", 
+                    "lead_sjbtag_corr__nom",  "lead_sjbtag_corr__up",  "lead_sjbtag_corr__down",  "sublead_sjbtag_corr__nom",  "sublead_sjbtag_corr__up",  "sublead_sjbtag_corr__down",  
+                    "Pdfweight__up", "Pdfweight__down", 
+                    "PSWeight[0]",  "PSWeight[1]", "PSWeight[2]", "PSWeight[3]",
+                    ]
+
+            #read number of scale variations
+            event = Event(inTree, 0)
+            nLHEScale = inTree.readBranch("nLHEScaleWeight")
+            for i in range(nLHEScale): sys_branch_names.append("LHEScaleWeight[%i]" % i)
+
+            if(self.year == 2016 or self.year == 2017):
+                sys_branch_names += ['Prefire__nom', 'Prefire__up', 'Prefire__down']
+        else:
+            sys_branch_names = [
+                    "PSWeight[0]",  "PSWeight[1]", "PSWeight[2]", "PSWeight[3]",
+                    ]
+            event = Event(inTree, 0)
+            nLHEScale = inTree.readBranch("nLHEScaleWeight")
+            for i in range(nLHEScale): sys_branch_names.append("LHEScaleWeight[%i]" % i)
+
 
         print("Avg. weights: ")
         for sys_branch in sys_branch_names:
@@ -591,7 +602,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
 # -------- Begin Loop over tree-------------------------------------
 
         entries = inTree.entries
-        for entry in xrange(entries):
+        for entry in range(entries):
 
 
             if count % 10000 == 0 :

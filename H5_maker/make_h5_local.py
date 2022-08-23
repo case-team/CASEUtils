@@ -1,4 +1,5 @@
 from H5_maker import * 
+from ttbar_h5_maker import *
 
 
 parser = OptionParser()
@@ -20,7 +21,7 @@ if(options.flag == -1234):
     exit(1)
 
 if(options.ttbar):
-    NanoReader(options.flag, inputFileNames = [options.fin], outputFileName = options.fout, json = options.json, year = options.year, 
+    NanoReader_TTbar(options.flag, inputFileNames = [options.fin], outputFileName = options.fout, json = options.json, year = str(options.year), 
         nEventsMax = options.nEvents, include_systematics = options.sys, do_top_ptrw = options.top_ptrw, sampleType = options.sample_type)
 else:
 
