@@ -95,7 +95,6 @@ class Outputer_TTbar(Outputer):
         event_info = [eventNum, MET, MET_phi, genWeight, run, self.year]
 
         jet1.pt_corr = jet1.pt
-
         jet1.msoftdrop_corr = jet1.msoftdrop
 
 
@@ -234,7 +233,7 @@ class Outputer_TTbar(Outputer):
 
 
 
-            gen_weight = prefire_nom * pileup_nom * btag_nom * top_ptrw_nom * mu_weights["nominal"]
+            gen_weight = prefire_nom * pileup_nom * btag_nom * top_ptrw_nom * mu_weights["nominal"] * np.sign(genWeight)
             sys_weights = [gen_weight, pdf_up, pdf_down, prefire_up, prefire_down, pileup_up, pileup_down, btag_up, btag_down, 
                             PS_ISR_up, PS_ISR_down, PS_FSR_up, PS_FSR_down, F_up, F_down, R_up, R_down, RF_up, RF_down, top_ptrw_up, top_ptrw_down,
                             mu_weights['trigger_up'], mu_weights['trigger_down'], mu_weights['id_up'], mu_weights['id_down']]
@@ -527,6 +526,7 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
             AK8Jets = Collection(event, "FatJet")
             AK4Jets = Collection(event, "Jet")
             Mus = Collection(event, "Muon")
+            TrigObjs = Collection(event, "TrigObj")
             nPVs = inTree.readBranch("PV_npvsGood")
 
             MET = inTree.readBranch('MET_pt')
@@ -537,25 +537,50 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
                 
 
 
-            ak4_min_pt = 30.
+            ak4_min_pt = 25.
             ak8_min_pt = 200.
 
             pf_conts_start = 0 #keep track of indices for PF candidates
             jet_index = 0
             num_jets = 0
 
+            #trigger objs
+
+
+
+
+            #select muon
             sel_mu = None
             nMu = 0
             for mu in Mus:
-                if(mu.tightId and mu.pt > 60. and abs(mu.eta) < 2.4):
+                if(mu.tightId and mu.pt > 60. and abs(mu.eta) < 2.4 and abs(mu.dxy) <= 0.2 and mu.miniPFRelIso_all < 0.1 ):
                     nMu +=1
                     if(sel_mu is None): sel_mu = mu
 
+            if(sel_mu is None): continue
+
+            #match to trig obj
+            #https://cms-nanoaod-integration.web.cern.ch/integration/cms-swCMSSW_10_6_X/mc106Xul17v2_doc.html
+            #Mu50 is 1024 and Mu100 is 2048 bit
+            trig_obj = None
+            min_trig_dR = 99999.
+            for t_obj in TrigObjs:
+                if(t_obj.id == 13 and t_obj.filterBits > 1024):
+                    if(trig_obj is None or deltaR(trig_obj, sel_mu) < min_trig_dR): 
+                        trig_obj = t_obj
+                        min_trig_dR = deltaR(trig_obj, sel_mu)
+
+            if(trig_obj is None): 
+                print("No trig obj?")
+                continue
+
+
+
             #cut on MET and muons
-            if((sel_mu is None) or (nMu > 1) or (MET < 50.) or (MET + sel_mu.pt < 250.) or nPVs < 1 ): continue
+            if((sel_mu is None) or (nMu > 1) or (MET < 50.) or (MET + sel_mu.pt < 200.) or nPVs < 1 or deltaR(mu, trig_obj) > 0.15  ): continue
 
             rel_pt_cut  = 25.
-            ang_cut = 2. * ROOT.TMath.Pi() / 3.
+            ang_cut = 2.
             closest_jet = None
             min_jet_dR = 99999.
             nAK4s = 0
@@ -576,9 +601,9 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
                         btag_jet = jet
 
 
-            if(closest_jet is None): continue
+            #if(closest_jet is None): continue
             #print(min_jet_dR, rel_pt(sel_mu, closest_jet))
-            mu_iso = (closest_jet is not None) and ((min_jet_dR > 0.4) or sel_mu.jetPtRelv2 > rel_pt_cut)
+            #mu_iso = (closest_jet is not None) and ((min_jet_dR > 0.4) or sel_mu.jetPtRelv2 > rel_pt_cut)
 
             ak4_cuts = nAK4s >= 2 and pass_btag
 
@@ -612,7 +637,7 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
             ak8_cuts = (j1_ak8 is not None) and (j1_ak8.pt > ak8_min_pt) and not inHEMRegion(j1_ak8, year)
             #print(mu_iso, ak4_cuts, ak8_cuts)
 
-            if(not mu_iso or not ak4_cuts or not ak8_cuts): continue
+            if(not ak4_cuts or not ak8_cuts): continue
 
 
             saved+=1
