@@ -645,9 +645,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             ###
             muons = Collection(event, "Muon")
             electrons = Collection(event, "Electron")
-            photons = Collection(event, "Photon")
 
-            
 
             ###
             ### Jets
@@ -672,20 +670,14 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
 
                     badjet = False
                     for m,muon in enumerate(muons):
-                        if muon.looseId and muon.pt > 40 and deltaR(muon,jet)<0.8:
+                        if muon.pt > 40 and muon.tightId and muon.pfRelIso04_all < 0.15 and deltaR(muon,jet)<0.8:
                             badjet = True
                             break
                     if badjet:
                         continue
                     for e,electron in enumerate(electrons):
                         # https://twiki.cern.ch/twiki/bin/view/CMS/CutBasedElectronIdentificationRun2#Cut_Based_Electron_ID_for_Run_2
-                        if electron.mvaFall17V2Iso_WPL and electron.pt > 40 and deltaR(electron,jet)<0.8:
-                            badjet = True
-                            break
-                    if badjet:
-                        continue
-                    for p,photon in enumerate(photons):
-                        if (photon.cutBased & 2 == 2) and photon.pt > 40 and deltaR(photon,jet)<0.8:
+                        if electron.pt > 40 and electron.mvaFall17V2noIso_WP80 and deltaR(electron,jet)<0.8:
                             badjet = True
                             break
                     if badjet:
@@ -711,7 +703,6 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
                     pf_conts_start += jet.nPFConstituents
                 
                 jet_index += 1
-            
             
             
 
