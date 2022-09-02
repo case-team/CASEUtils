@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import ROOT
 from Utils import roundTo
@@ -48,10 +49,17 @@ def fit_signals(options):
                                       dcb_model=options.dcbModel, 
                                       fit_range = options.fitRange)
 
+        parameters = dict()
         for var, graph in full_graphs.iteritems():
             val, err = current_fit.fetch(var)
+            parameters[var] = val
+            parameters['%s-err' % var] = err
             graph.SetPoint(i, mass, val)
             graph.SetPointError(i, 0.0, err)
+
+        sig_file_name = os.path.join(out_dir, "sig_fit_{}.json".format(mass))
+        with open(sig_file_name, 'w') as f:
+            json.dump(parameters, f, indent=4)
 
     full_file_name = os.path.join(out_dir, "full_fit.root")
     full_outfile = ROOT.TFile(full_file_name, "RECREATE")
