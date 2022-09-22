@@ -234,4 +234,23 @@ class Fitter(object):
             #alt func
             #model = ROOT.RooGenericPdf(name, "( @1*pow(1-@0/13000 + @4*pow(@0/13000,2),@2) ) / ( pow(@0/13000,@3) )", ROOT.RooArgList(self.w.var(poi), self.w.var("p1"), self.w.var("p2"), self.w.var("p3"), self.w.var("p4")))
 
+        elif nPars ==5:
+            self.w.factory("p1[9.28433e+00, -100. , 100.]")
+            self.w.factory("p2[1.03641e+01, -200, 200]")	 
+            self.w.factory("p3[2.35256e+00, -100., 100.]")
+            self.w.factory("p4[4.17695e-01, -100., 100.]")
+            self.w.factory("p5[1.00000e+01, -100., 100.]")
+            model = ROOT.RooGenericPdf(name, "pow(exp(-@0/13000.),@4) *pow(1-@0/13000., @1)/ ( pow(@0/13000., @2+@3*log(@0/13000.)+@4*pow(log(@0/13000.),2)) )", 
+                    ROOT.RooArgList(self.w.var(poi), self.w.var("p1"), self.w.var("p2"), self.w.var("p3"), self.w.var("p4"), self.w.var("p5")))
+
+        elif nPars==6:
+
+            self.w.factory("p1[6.02992e+00, -100. , 100]")
+            self.w.factory("p2[6.28634e+00, -200., 200]")
+            self.w.factory("p3[6.32552e-01, -100., 100.]")
+            self.w.factory("p4[-8.53977e-02, -100., 100.]")
+            self.w.factory("p5[1000, 1., 5000.]")
+            self.w.factory("p6[1600, 0., 2500.]")
+            model = ROOT.RooGenericPdf(name, "(0.5*tanh((@0-@6)/@5) + .5)*pow(1-@0/13000., @1) / ( pow(@0/13000., @2+@3*log(@0/13000.)+@4*pow(log(@0/13000.),2)) )", ROOT.RooArgList(self.w.var(poi), self.w.var("p1"), self.w.var("p2"), self.w.var("p3"), self.w.var("p4"), self.w.var("p5"), self.w.var("p6"))) 
+
         getattr(self.w,'import')(model,ROOT.RooFit.Rename(name))

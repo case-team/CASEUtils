@@ -177,7 +177,7 @@ def dijetfit(options):
 
 
     print("\n\n ############# FIT BACKGROUND AND SAVE PARAMETERS ###########")
-    nParsToTry = [2, 3, 4]
+    nParsToTry = [2, 3, 4, 5, 6]
     chi2s = [0]*len(nParsToTry)
     ndofs = [0]*len(nParsToTry)
     probs = [0]*len(nParsToTry)
@@ -301,7 +301,7 @@ def dijetfit(options):
         dhist = ROOT.RooHist(frame.findObject(data_name, ROOT.RooHist.Class()))
 
 
-        my_chi2, my_ndof = calculateChi2(hpull, nPars, ranges=chi2_range, excludeZeros = True, dataHist = dhist)
+        my_chi2, my_ndof = calculateChi2(hpull, nPars, ranges=chi2_range, excludeZeros = False, dataHist = dhist)
         my_prob = ROOT.TMath.Prob(my_chi2, my_ndof)
         PlotFitResults(frame, fres.GetName(), nPars, framePulls, data_name,
                        model_name, my_chi2, my_ndof,
