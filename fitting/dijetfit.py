@@ -1,9 +1,7 @@
 import os
 from Fitter import Fitter
 from DataCardMaker import DataCardMaker
-from Utils import load_h5_sig, load_h5_sb, truncate, apply_blinding
-from Utils import f_test, calculateChi2, PlotFitResults, checkSBFit
-from Utils import check_rough_sig, roundTo
+from Utils import *
 from array import array
 import pickle
 import json
@@ -116,13 +114,18 @@ def fit_signalmodel(input_file, sig_file_name, mass, x_bins, fine_bins,
 
 
 def dijetfit(options):
+
     label = options.label
     plot_dir = options.plotDir
     if(plot_dir[-1] != '/'):
         plot_dir += '/'
 
-    os.system("mkdir %s" % plot_dir)
-    os.system("mkdir %s" % plot_dir)
+    if(not os.path.exists(plot_dir)):
+        os.system("mkdir %s" % plot_dir)
+
+    if(os.path.exists(plot_dir + "fit_results_{}.json".format(options.mass))):
+        #remove old results
+        os.system("rm %s" % plot_dir + "fit_results_{}.json".format(options.mass))
 
     fine_bin_size = 4
     mass = options.mass 
@@ -149,17 +152,26 @@ def dijetfit(options):
     roundTo(binsx, fine_bin_size)
 
 
-    roobins = ROOT.RooBinning(len(binsx)-1, array('d', binsx), "mjjbins")
+
     bins_fine = int(binsx[-1] - binsx[0])/fine_bin_size
 
     histos_sb = ROOT.TH1F("mjj_sb", "mjj_sb" ,bins_fine, binsx[0], binsx[-1])
     
-    # useful to check if doing blinding correctly
-    #load_h5_sb(options.inputFile, histos_sb, sb1_edge=sb1_edge + 40.,
-    #           sb2_edge=sb2_edge - 40.)
     
     load_h5_sb(options.inputFile, histos_sb)
     print("************ Found %i total events \n" % histos_sb.GetEntries())
+
+    
+
+    if(options.rebin):
+        bins_nonzero = get_rebinning(binsx, histos_sb)
+        print("Rebinning to avoid zero bins!")
+        print("old", binsx)
+        print("new", bins_nonzero)
+        bins = bins_nonzero
+    else:
+        bins = binsx
+    roobins = ROOT.RooBinning(len(bins)-1, array('d', bins), "mjjbins")
 
     if(options.refit_sig):
         print ("########## FIT SIGNAL AND SAVE PARAMETERS ############")
@@ -177,40 +189,22 @@ def dijetfit(options):
 
 
     print("\n\n ############# FIT BACKGROUND AND SAVE PARAMETERS ###########")
-    nParsToTry = [2, 3, 4, 5, 6]
+    #nParsToTry = [2, 3, 4, 5, 6]
+    nParsToTry = [2, 3, 4]
     chi2s = [0]*len(nParsToTry)
     ndofs = [0]*len(nParsToTry)
     probs = [0]*len(nParsToTry)
     qcd_fnames = [""]*len(nParsToTry)
-    sb1_edge = 2232
-    sb2_edge = 2776
 
-    regions = [("SB1", binsx[0], sb1_edge),
-               ("SB2", sb2_edge, binsx[-1]),
-               ("SR", sb1_edge, sb2_edge),
-               ("FULL", binsx[0], binsx[-1])]
 
-    blind_range = ROOT.RooFit.Range("SB1,SB2")
-    full_range = ROOT.RooFit.Range("FULL")
-    fit_ranges = [(binsx[0], sb1_edge), (sb2_edge, binsx[-1])]
 
-    histos_sb_blind = apply_blinding(histos_sb, ranges=fit_ranges)
-    num_blind = histos_sb_blind.Integral()
 
     if options.blinded:
-        fitting_histogram = histos_sb_blind
-        data_name = "data_qcd_blind"
-        fit_range = blind_range
-        chi2_range = fit_ranges
-        norm = ROOT.RooFit.Normalization(num_blind, ROOT.RooAbsReal.NumEvent)
+        print("BLIND FIT LONGER SUPPORTED!")
+        exit(1)
 
-    else:
-        fitting_histogram = histos_sb
-        data_name = "data_qcd"
-        fit_range = full_range
-        chi2_range = None
-        norm = ROOT.RooFit.Normalization(histos_sb.Integral(),
-                                         ROOT.RooAbsReal.NumEvent)
+    fitting_histogram = histos_sb
+    data_name = "data_qcd"
 
     for i, nPars in enumerate(nParsToTry):
         print("Trying %i parameter background fit" % nPars)
@@ -218,22 +212,16 @@ def dijetfit(options):
         qcd_outfile = ROOT.TFile(qcd_fnames[i], 'RECREATE')
 
         model_name = "model_b" + str(i)
-        fitter_QCD = Fitter(['mjj_fine'])
+        fitter_QCD = Fitter(['mjj_fine'], debug = False)
         fitter_QCD.qcdShape(model_name, 'mjj_fine', nPars)
-        fitter_QCD.importBinnedData(fitting_histogram, ['mjj_fine'], data_name,
-                                    regions=regions)
-
-        # For some reason (???) the first fit gives some weird results, but if
-        # you fit it twice it works ok??? This should be fixed...
+        fitter_QCD.importBinnedData(fitting_histogram, ['mjj_fine'], data_name)
+        
+        #Running fit two times seems to improve things (better initial guesses for params?)
         
         fres = fitter_QCD.fit(model_name, data_name,
-                              options=[ROOT.RooFit.Save(1),
-                                       ROOT.RooFit.Verbose(0),
-                                       fit_range])
-        fres = fitter_QCD.fit(model_name, data_name,
-                              options=[ROOT.RooFit.Save(1),
-                                       ROOT.RooFit.Verbose(0),
-                                       fit_range])
+                              options=[ROOT.RooFit.Save(1), ROOT.RooFit.Verbose(0), ROOT.RooFit.Minos(1)])
+
+        fres = fitter_QCD.fit(model_name, data_name, options=[ROOT.RooFit.Save(1), ROOT.RooFit.Verbose(0),  ROOT.RooFit.Minos(1)])
 
         chi2_fine = fitter_QCD.projection(
             model_name, data_name, "mjj_fine",
@@ -241,67 +229,62 @@ def dijetfit(options):
 
         #chi2_binned = fitter_QCD.projection(
         #     model_name, data_name, "mjj_fine",
-        #     plot_dir + str(nPars) + "par_qcd_fit_binned.png",roobins,True)
+        #     plot_dir + str(nPars) + "par_qcd_fit_binnedx.png",roobins,True)
+
 
         qcd_outfile.cd()
-        histos_sb_blind.Write()
 
         mjj = fitter_QCD.getVar('mjj_fine')
         mjj.setBins(bins_fine)
         model = fitter_QCD.getFunc(model_name)
         dataset = fitter_QCD.getData(data_name)
 
+        #rescale so pdfs are in evts per 100 GeV
+        low = roobins.lowBound()
+        high = roobins.highBound()
+        n = roobins.numBoundaries() - 1
+
+        #RootFit default normalization is full range divided by number of bins
+        default_norm = (high - low)/ n
+
+        rescale = 100./ default_norm
+
+        fit_norm = ROOT.RooFit.Normalization(rescale,ROOT.RooAbsReal.Relative)
+
+        #print("n, rescale", n, rescale)
+
+
         frame = mjj.frame()
-        dataset.plotOn(frame, ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson),
-                       ROOT.RooFit.Name(data_name), ROOT.RooFit.Invisible(),
-                       ROOT.RooFit.Binning(roobins))
+        dataset.plotOn(frame, ROOT.RooFit.Name(data_name), ROOT.RooFit.Invisible(), ROOT.RooFit.Binning(roobins), ROOT.RooFit.DataError(ROOT.RooAbsData.SumW2), 
+                ROOT.RooFit.Rescale(rescale))
 
-        model.plotOn(frame, ROOT.RooFit.VisualizeError(fres, 1),
-                     ROOT.RooFit.FillColor(ROOT.kRed - 7),
-                     ROOT.RooFit.LineColor(ROOT.kRed - 7),
-                     ROOT.RooFit.Name(fres.GetName()), 
-                     fit_range.Clone(), norm)
+        model.plotOn(frame, ROOT.RooFit.VisualizeError(fres, 1), ROOT.RooFit.FillColor(ROOT.kRed - 7), ROOT.RooFit.LineColor(ROOT.kRed - 7), ROOT.RooFit.Name(fres.GetName()), 
+                       fit_norm)
 
-        model.plotOn(frame, ROOT.RooFit.LineColor(ROOT.kRed + 1),
-                     ROOT.RooFit.Name(model_name), 
-                     fit_range.Clone(), norm)
+        model.plotOn(frame, ROOT.RooFit.LineColor(ROOT.kRed + 1), ROOT.RooFit.Name(model_name),  fit_norm)
         
 
-        # Compute integrals over signal region
-        #mjj_set = ROOT.RooArgSet(mjj)
-        #sig_region_integral = model.createIntegral(
-        #    mjj_set,
-        #    ROOT.RooFit.NormSet(mjj_set),
-        #    ROOT.RooFit.Range("SR")).getVal()
-        #
-        #full_integral = model.createIntegral(mjj_set,
-        #                                     ROOT.RooFit.NormSet(mjj_set),
-        #                                     full_range).getVal()
-        #
-        #print("Sig region integral " , sig_region_integral)
-        #print("Full integral " , full_integral)
-        #num_full = num_blind * (1 + sig_region_integral/full_integral)
-        #full_norm = ROOT.RooFit.Normalization(histos_sb.Integral(),
-        #                                      ROOT.RooAbsReal.NumEvent)
-
-        dataset.plotOn(frame, ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson),
-                       ROOT.RooFit.Name(data_name), ROOT.RooFit.XErrorSize(0),
-                       ROOT.RooFit.Binning(roobins))
-
-        # for correct pulls:
-        model.plotOn(frame, ROOT.RooFit.Invisible(),
-                     ROOT.RooFit.Name(model_name), full_range, norm)
-
-        # average bin edges instead of bin center
-        framePulls = mjj.frame()
         useBinAverage = True
         hpull = frame.pullHist(data_name, model_name, useBinAverage)
-        framePulls.addPlotable(hpull, "X0 P E1")
-
+        hresid = frame.residHist(data_name, model_name, False, useBinAverage)
         dhist = ROOT.RooHist(frame.findObject(data_name, ROOT.RooHist.Class()))
 
+        #print_roohist(dhist)
 
-        my_chi2, my_ndof = calculateChi2(hpull, nPars, ranges=chi2_range, excludeZeros = False, dataHist = dhist)
+        #redraw data (so on top of model curves)
+        if(options.rebin):
+            dataset.plotOn(frame, ROOT.RooFit.Name(data_name),   ROOT.RooFit.Binning(roobins), ROOT.RooFit.DataError(ROOT.RooAbsData.SumW2),
+                       ROOT.RooFit.Rescale(rescale))
+        else:
+            dataset.plotOn(frame, ROOT.RooFit.Name(data_name),  ROOT.RooFit.XErrorSize(0), ROOT.RooFit.Binning(roobins), ROOT.RooFit.DataError(ROOT.RooAbsData.SumW2),
+                       ROOT.RooFit.Rescale(rescale))
+
+
+        framePulls = mjj.frame()
+        framePulls.addPlotable(hpull, "X0 P E1")
+
+
+        my_chi2, my_ndof = calculateChi2(hpull, nPars, excludeZeros = True, dataHist = dhist)
         my_prob = ROOT.TMath.Prob(my_chi2, my_ndof)
         PlotFitResults(frame, fres.GetName(), nPars, framePulls, data_name,
                        model_name, my_chi2, my_ndof,
@@ -346,7 +329,6 @@ def dijetfit(options):
     #histos_sb.Print("range")
     #histos_qcd.Print("range")
     #histos_sig.Print("range")
-    print("************ Found", histos_sb.GetEntries(), "total events")
 
     sb_fname = "sb_fit.root"
     sb_outfile = ROOT.TFile(sb_fname, 'RECREATE')
@@ -499,6 +481,8 @@ def fitting_options():
     parser.add_option("--refit_sig", default=False, action="store_true",
                       help="""Fit the signal events (using truth labels)
                       to get signal shape""")
+    parser.add_option("--rebin", default=False, action="store_true",
+                      help="""Rebin dijet bins to make sure no bins less than 5 evts""")
     parser.add_option("-M", "-M", dest="mass", type=float, default=2500.,
                       help="Injected signal mass")
     parser.add_option("-i", "--inputFile", dest="inputFile",
