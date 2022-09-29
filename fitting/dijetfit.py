@@ -51,7 +51,10 @@ def fit_signalmodel(input_file, sig_file_name, mass, x_bins, fine_bins,
     fitter.w.var("MH").setVal(mass)
     fitter.importBinnedData(histos_sig, ['mjj_fine'], 'data')
     fres = fitter.fit('model_s', 'data', [ROOT.RooFit.Save(1)])
-    #fres.Print()
+    if fres:
+        fname = sig_file_name.replace('.root', '.txt')
+        with open(fname, 'w') as f:
+            f.write('%d\n' % fres.status())
     mjj_fine = fitter.getVar('mjj_fine')
     mjj_fine.setBins(len(bins_sig_fit))
 
