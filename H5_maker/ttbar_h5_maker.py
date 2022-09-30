@@ -5,21 +5,6 @@ from correction_utils import *
 
 
 
-def ang_dist(phi1, phi2):
-    dphi = phi1 - phi2
-    if(dphi < -math.pi):
-        dphi += 2.* math.pi
-    if(dphi > math.pi):
-        dphi -= 2.*math.pi
-    return dphi
-
-def deltaR(o1, o2):
-    #o1_vec = ROOT.TLorentzVector()
-    #o2_vec = ROOT.TLorentzVector()
-    #o1_vec.SetPtEtaPhiM(o1.pt, o1.eta, o1.phi, 0.)
-    #o2_vec.SetPtEtaPhiM(o2.pt, o2.eta, o2.phi, 0.)
-    #return o1.DeltaR(o2)
-    return ((o1.eta - o2.eta)**2 + ang_dist(o1.phi, o2.phi)**2)**(0.5)
 
 def rel_pt(mu, jet):
     mu_vec = ROOT.TLorentzVector()
@@ -61,9 +46,9 @@ class Outputer_TTbar(Outputer):
         self.btag_jet_info = np.zeros((self.batch_size, 5), dtype=np.float32)
         self.mu_info = np.zeros((self.batch_size, 4), dtype=np.float32)
         self.event_info = np.zeros((self.batch_size, 6), dtype=np.float32)
-        self.sys_weights = np.zeros((self.batch_size, 25), dtype=np.float32)
+        self.sys_weights = np.zeros((self.batch_size, 27), dtype=np.float32)
         self.jet1_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
-        self.gen_parts = np.zeros((self.batch_size, 25), dtype=np.float32)
+        self.gen_parts = np.zeros((self.batch_size, 28), dtype=np.float32)
 
 
     
@@ -141,10 +126,48 @@ class Outputer_TTbar(Outputer):
 
             mu_weights =  get_lepton_weights(sel_mu, self.year)
             #print(sel_mu.pt, sel_mu.eta, mu_weights)
-            #These branches are not in the regualr PFNano/Pancakes should have been added by TIMBER
+
+
+            #Renorm / Fac weights
+            nScale = 0
+            scale_fail = False
+            if(not scale_fail):
+                try:
+                    nScale = inTree.readBranch("nLHEScaleWeight")
+                except:
+                    scale_fail = True
+
+            RF_down = R_down = F_down = F_up = R_up = RF_up = 1.
+            if(nScale == 9):
+                #order https://cms-nanoaod-integration.web.cern.ch/integration/cms-swCMSSW_10_6_X/mc106Xul17_doc.html
+                scale_weights = inTree.readBranch("LHEScaleWeight")
+                
+                RF_down = scale_weights[0] / self.avg_weights['LHEScaleWeight[0]']
+                R_down = scale_weights[1] / self.avg_weights['LHEScaleWeight[1]']
+                F_down = scale_weights[3] / self.avg_weights['LHEScaleWeight[3]']
+                F_up = scale_weights[5] / self.avg_weights['LHEScaleWeight[5]']
+                R_up = scale_weights[7] / self.avg_weights['LHEScaleWeight[7]']
+                RF_up = scale_weights[8] / self.avg_weights['LHEScaleWeight[8]']
+            elif(nScale == 8):
+                #some files only have 8 weights
+                scale_weights = inTree.readBranch("LHEScaleWeight")
+                
+                RF_down = scale_weights[0] / self.avg_weights['LHEScaleWeight[0]']
+                R_down = scale_weights[1] / self.avg_weights['LHEScaleWeight[1]']
+                F_down = scale_weights[3] / self.avg_weights['LHEScaleWeight[3]']
+                F_up = scale_weights[4] / self.avg_weights['LHEScaleWeight[4]']
+                R_up = scale_weights[6] / self.avg_weights['LHEScaleWeight[6]']
+                RF_up = scale_weights[7] / self.avg_weights['LHEScaleWeight[7]']
+
+
+
+
+
+
 
             #PDF's
-            pdf_up, pdf_down = get_pdf_weight(inTree)
+            if(not scale_fail): pdf_up, pdf_down = get_pdf_weight(inTree)
+            else: pdf_up = pdf_down = 1.0
             
             #Prefire
             if("2016" in self.year or "2017" in self.year):
@@ -176,51 +199,30 @@ class Outputer_TTbar(Outputer):
                 PS_FSR_down = PS_weights[3] / self.avg_weights['PSWeight[3]']
 
 
-            #Renorm / Fac weights
-
-            nScale = inTree.readBranch("nLHEScaleWeight")
-            RF_down = R_down = F_down = F_up = R_up = RF_up = 1.
-            if(nScale == 9):
-                #order https://cms-nanoaod-integration.web.cern.ch/integration/cms-swCMSSW_10_6_X/mc106Xul17_doc.html
-                scale_weights = inTree.readBranch("LHEScaleWeight")
-                
-                RF_down = scale_weights[0] / self.avg_weights['LHEScaleWeight[0]']
-                R_down = scale_weights[1] / self.avg_weights['LHEScaleWeight[1]']
-                F_down = scale_weights[3] / self.avg_weights['LHEScaleWeight[3]']
-                F_up = scale_weights[5] / self.avg_weights['LHEScaleWeight[5]']
-                R_up = scale_weights[7] / self.avg_weights['LHEScaleWeight[7]']
-                RF_up = scale_weights[8] / self.avg_weights['LHEScaleWeight[8]']
-            elif(nScale == 8):
-                #some files only have 8 weights
-                scale_weights = inTree.readBranch("LHEScaleWeight")
-                
-                RF_down = scale_weights[0] / self.avg_weights['LHEScaleWeight[0]']
-                R_down = scale_weights[1] / self.avg_weights['LHEScaleWeight[1]']
-                F_down = scale_weights[3] / self.avg_weights['LHEScaleWeight[3]']
-                F_up = scale_weights[4] / self.avg_weights['LHEScaleWeight[4]']
-                R_up = scale_weights[6] / self.avg_weights['LHEScaleWeight[6]']
-                RF_up = scale_weights[7] / self.avg_weights['LHEScaleWeight[7]']
 
             top_ptrw_nom = top_ptrw_up = top_ptrw_down = 1.0
             if(self.do_top_ptrw):
                 
                 #save gen particles
-                top, anti_top, W, anti_W, quark, anti_quark, b_quark = get_ttbar_gen_parts(event)
+                top, anti_top, W, anti_W, fermion, anti_fermion, b_quark = get_ttbar_gen_parts(event, jet1)
                 top_ptrw_nom, top_ptrw_up, top_ptrw_down = get_top_ptrw(event, top, anti_top)
 
-                #print(top, anti_top, W, anti_W, quark, anti_quark, b_quark)
+                match = check_matching(jet1, fermion, anti_fermion, b_quark)
+                #print(top, anti_top, W, anti_W, fermion, anti_fermion, b_quark)
 
-                gen_parts = [top.pt, top.eta, top.phi, top.mass, 
+                gen_parts = [match, top.pt, top.eta, top.phi, top.mass, 
                              anti_top.pt, anti_top.eta, anti_top.phi, anti_top.mass, 
                              W.pt, W.eta, W.phi, W.mass, 
                              anti_W.pt, anti_W.eta, anti_W.phi, anti_W.mass]
 
                 #add quarks and b if they were found
-                if(quark is not None and anti_quark is not None):
-                    gen_parts += [quark.pt, quark.eta, quark.phi, anti_quark.pt, anti_quark.eta, anti_quark.phi] 
+                if(fermion is not None and anti_fermion is not None):
+                    gen_parts += [fermion.pt, fermion.eta, fermion.phi, fermion.pdgId, anti_fermion.pt, anti_fermion.eta, anti_fermion.phi, anti_fermion.pdgId] 
                 else: gen_parts += [0.]*6
                 if(b_quark is not None): gen_parts += [b_quark.pt, b_quark.eta, b_quark.phi]
                 else: gen_parts += [0.]*3
+
+
 
                 gen_parts = np.array(gen_parts, dtype = np.float32)
 
@@ -236,7 +238,7 @@ class Outputer_TTbar(Outputer):
             gen_weight = prefire_nom * pileup_nom * btag_nom * top_ptrw_nom * mu_weights["nominal"] * np.sign(genWeight)
             sys_weights = [gen_weight, pdf_up, pdf_down, prefire_up, prefire_down, pileup_up, pileup_down, btag_up, btag_down, 
                             PS_ISR_up, PS_ISR_down, PS_FSR_up, PS_FSR_down, F_up, F_down, R_up, R_down, RF_up, RF_down, top_ptrw_up, top_ptrw_down,
-                            mu_weights['trigger_up'], mu_weights['trigger_down'], mu_weights['id_up'], mu_weights['id_down']]
+                            mu_weights['trigger_up'], mu_weights['trigger_down'], mu_weights['id_up'], mu_weights['id_down'], mu_weights['iso_up'], mu_weights['iso_down']]
             #print(sys_weights)
 
 
@@ -434,6 +436,9 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
     elif("2017" in year): btag_cut = 0.4506
     elif("2016APV" in year): btag_cut = 0.6001 #preVFP
     elif("2016" in year): btag_cut = 0.5847 #postVFP
+    else: 
+        print("invalid year! %s")
+        exit1(1)
 
 
 
@@ -479,6 +484,8 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
             inTree= InputTree(TTree) 
             print('Running over %i entries \n' % nTotal)
 
+        if(nTotal ==0): continue
+
         if(include_systematics):
             out.get_weight_avgs(inTree, ttbar = True)
 
@@ -491,6 +498,20 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
 
 
 # -------- Begin Loop over tree-------------------------------------
+
+
+        #quick check
+        event = Event(inTree, 0)
+        AK8Jets = Collection(event, "FatJet")
+
+        try:
+            b = event.FatJet_nConstituents
+            alt_lookup = False
+        except:
+            alt_lookup = True
+            
+
+
 
         entries = inTree.entries
         for entry in range(entries):
@@ -513,7 +534,6 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
             if(not passFilter): 
                 continue
             
-            # Apply triggers only to data and MC
             for trig in triggers:
                 passTrigger = passTrigger or inTree.readBranch(trig)
 
@@ -553,20 +573,22 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
             sel_mu = None
             nMu = 0
             for mu in Mus:
-                if(mu.tightId and mu.pt > 60. and abs(mu.eta) < 2.4 and abs(mu.dxy) <= 0.2 and mu.miniPFRelIso_all < 0.1 ):
+                if(mu.tightId and mu.pt > 60. and abs(mu.eta) < 2.4 and abs(mu.dxy) <= 0.2 and mu.miniPFRelIso_all < 0.10):
                     nMu +=1
                     if(sel_mu is None): sel_mu = mu
 
             if(sel_mu is None): continue
 
-            #match to trig obj
-            #https://cms-nanoaod-integration.web.cern.ch/integration/cms-swCMSSW_10_6_X/mc106Xul17v2_doc.html
+
+            #match muon to trig obj
             #Mu50 is 1024 and Mu100 is 2048 bit
+            #https://cms-nanoaod-integration.web.cern.ch/integration/cms-swCMSSW_10_6_X/mc106Xul17v2_doc.html
             trig_obj = None
             min_trig_dR = 99999.
             for t_obj in TrigObjs:
                 if(t_obj.id == 13 and t_obj.filterBits > 1024):
-                    if(trig_obj is None or deltaR(trig_obj, sel_mu) < min_trig_dR): 
+
+                    if(trig_obj is None or deltaR(t_obj, sel_mu) < min_trig_dR): 
                         trig_obj = t_obj
                         min_trig_dR = deltaR(trig_obj, sel_mu)
 
@@ -574,14 +596,21 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
                 print("No trig obj?")
                 continue
 
+            if(deltaR(trig_obj, sel_mu) > 0.15):
+                #print("trig reject dR %.3f" % deltaR(trig_obj, sel_mu))
+                continue
+
+            W_cand_px = sel_mu.pt * np.cos(sel_mu.phi) + MET * np.cos(MET_phi)
+            W_cand_py = sel_mu.pt * np.sin(sel_mu.phi) + MET * np.sin(MET_phi)
+            W_cand_pt = (W_cand_px**2 + W_cand_py**2)**(0.5)
+            #print("W pt %.1f mu pt %.1f MET %.1f" % (W_cand_pt, sel_mu.pt, MET))
+
 
 
             #cut on MET and muons
-            if((sel_mu is None) or (nMu > 1) or (MET < 50.) or (MET + sel_mu.pt < 200.) or nPVs < 1 or deltaR(mu, trig_obj) > 0.15  ): continue
+            if((nMu > 1) or (MET < 50.) or (MET + sel_mu.pt < 100.) or nPVs < 1): continue
 
-            rel_pt_cut  = 25.
             ang_cut = 2.
-            closest_jet = None
             min_jet_dR = 99999.
             nAK4s = 0
             j2_ak4 = None
@@ -592,18 +621,11 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
                 if(jet.pt > ak4_min_pt and abs(jet.eta) < 2.4):
                     jet_dR = deltaR(jet, sel_mu)
                     nAK4s +=1
-                    if jet_dR < min_jet_dR:
-                        min_jet_dR = jet_dR
-                        closest_jet = jet
                     #tightId and loose Pileup ID
                     if (jet.jetId & 2 == 2 and jet.puId % 2 == 1 and (ang_dist(sel_mu.phi, jet.phi)  < ang_cut) and jet.btagDeepB > btag_cut):
                         pass_btag = True
                         btag_jet = jet
 
-
-            #if(closest_jet is None): continue
-            #print(min_jet_dR, rel_pt(sel_mu, closest_jet))
-            #mu_iso = (closest_jet is not None) and ((min_jet_dR > 0.4) or sel_mu.jetPtRelv2 > rel_pt_cut)
 
             ak4_cuts = nAK4s >= 2 and pass_btag
 
@@ -615,6 +637,7 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
             pf_cands_start = 0
 
             for i,jet in enumerate(AK8Jets):
+                if(alt_lookup): jet.nConstituents = nPFCounter(jet_index, event)
                 jet.pf_cands_start = pf_cands_start
                 #pf_cands_start += jet.nPFCand
                 pf_cands_start += jet.nConstituents
@@ -635,7 +658,6 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
             
 
             ak8_cuts = (j1_ak8 is not None) and (j1_ak8.pt > ak8_min_pt) and not inHEMRegion(j1_ak8, year)
-            #print(mu_iso, ak4_cuts, ak8_cuts)
 
             if(not ak4_cuts or not ak8_cuts): continue
 

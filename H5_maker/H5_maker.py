@@ -64,7 +64,7 @@ JME_vars_map = {
 def nPFCounter(index, event):
     count = 0
     jet_indices = event.FatJetPFCands_jetIdx
-    length = len(event.FatJetPFCands_jetIdx)
+    length = len(list(event.FatJetPFCands_jetIdx))
     for i in range(length):
         if jet_indices[i] == index:
             count += 1
@@ -167,12 +167,16 @@ class Outputer:
             if(self.year == 2016 or self.year == 2017):
                 sys_branch_names += ['Prefire__nom', 'Prefire__up', 'Prefire__down']
         else:
-            sys_branch_names = [
-                    "PSWeight[0]",  "PSWeight[1]", "PSWeight[2]", "PSWeight[3]",
-                    ]
+            sys_branch_names = []
+
             event = Event(inTree, 0)
-            nLHEScale = inTree.readBranch("nLHEScaleWeight")
-            for i in range(nLHEScale): sys_branch_names.append("LHEScaleWeight[%i]" % i)
+            nPS = inTree.readBranch("nPSWeight")
+            if(nPS > 1): sys_branch_names += ["PSWeight[0]",  "PSWeight[1]", "PSWeight[2]", "PSWeight[3]"]
+            try:
+                nLHEScale = inTree.readBranch("nLHEScaleWeight")
+                for i in range(nLHEScale): sys_branch_names.append("LHEScaleWeight[%i]" % i)
+            except:
+                print("No scale weights found")
 
 
         print("Avg. weights: ")

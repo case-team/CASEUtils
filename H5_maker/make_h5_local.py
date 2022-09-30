@@ -1,5 +1,6 @@
 from H5_maker import * 
 from ttbar_h5_maker import *
+import glob
 
 
 parser = OptionParser()
@@ -20,11 +21,14 @@ if(options.flag == -1234):
     print("No --flag option set. You must specify what type of process this is! \n" )
     exit(1)
 
+if(".root" in options.fin): input_files = [options.fin]
+else: input_files = glob.glob(options.fin + "*.root")
+
 if(options.ttbar):
-    NanoReader_TTbar(options.flag, inputFileNames = [options.fin], outputFileName = options.fout, json = options.json, year = str(options.year), 
+    NanoReader_TTbar(options.flag, inputFileNames = input_files, outputFileName = options.fout, json = options.json, year = str(options.year), 
         nEventsMax = options.nEvents, include_systematics = options.sys, do_top_ptrw = options.top_ptrw, sampleType = options.sample_type)
 else:
 
-    NanoReader(options.flag, inputFileNames = [options.fin], outputFileName = options.fout, json = options.json, year = options.year, 
+    NanoReader(options.flag, inputFileNames = input_files, outputFileName = options.fout, json = options.json, year = options.year, 
         nEventsMax = options.nEvents, include_systematics = options.sys, do_top_ptrw = options.top_ptrw)
 
