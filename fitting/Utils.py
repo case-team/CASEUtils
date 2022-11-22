@@ -560,7 +560,7 @@ def checkSBFit(filename,label,roobins,plotname, nPars, plot_dir, plot_label = ""
     return chi2, ndof
 
 
-def f_test(nParams, nDof, chi2, fit_errs, thresh = 0.05, err_thresh = 0.3 ):
+def f_test(nParams, nDof, chi2, fit_errs, thresh = 0.05, err_thresh = 0.5):
     #assumes arrays are in increasing number of params order (ie nParams[0] is minimum number of params)
     print  "\n\n #################### STARTING F TEST #######################" 
     best_i = 0
