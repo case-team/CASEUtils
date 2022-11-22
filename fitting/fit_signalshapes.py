@@ -43,11 +43,11 @@ def fit_signals(options):
     for i, mass in enumerate(masses):
         print("########## FIT SIGNAL AND SAVE PARAMETERS ############")
         sig_file_name = os.path.join(out_dir, "sig_fit_{}.root".format(mass))
+        plot_label = "M%i_" % mass
         current_fit = fit_signalmodel(options.inputFiles[i], sig_file_name,
                                       mass, binsx, bins_fine, out_dir + "/",
-                                      return_fit=True,
-                                      dcb_model=options.dcbModel, 
-                                      fit_range = options.fitRange)
+                                      return_fit=True, dcb_model=options.dcbModel, 
+                                      fit_range = options.fitRange, plot_label = plot_label)
 
         parameters = dict()
         for var, graph in full_graphs.iteritems():

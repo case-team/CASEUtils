@@ -18,7 +18,7 @@ parser.add_argument("-M","--max",dest="max",type=float, help="maximum x",default
 
 args = parser.parse_args()
 ### use same settings as in diboson search
-all_graphs = {"graviton" : "mean:spline,sigma:spline,alpha:pol1,sign:pol1,alpha2:pol2,sign2:pol2"}
+all_graphs = {"diboson" : "mean:spline,sigma:spline,alpha:pol1,sign:pol1,alpha2:pol2,sign2:pol2"}
 
 
 #define output dictionary
