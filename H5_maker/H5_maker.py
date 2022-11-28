@@ -736,6 +736,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
                 jet1_msoftdrop_JER_down = inTree.readBranch("FatJet1_msoftdrop_JER_down")
                 jet2_msoftdrop_JER_down = inTree.readBranch("FatJet2_msoftdrop_JER_down")
 
+                #TODO JMS uncs of flag 5% ? 
                 jet1_msoftdrop_JMS_up = inTree.readBranch("FatJet1_msoftdrop_JMS_up")
                 jet2_msoftdrop_JMS_up = inTree.readBranch("FatJet2_msoftdrop_JMS_up")
 
