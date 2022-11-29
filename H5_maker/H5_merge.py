@@ -4,6 +4,7 @@ import h5py
 import os
 import sys
 import copy
+import glob
 from os import listdir
 from os.path import isfile, join
 
@@ -65,8 +66,9 @@ def merge_multiple(fout_name, fs):
 
 #merge_multiple("test.h5", ["output_files/QCD_HT1000to1500_0.h5", "output_files/QCD_HT1000to1500_1.h5", "output_files/QCD_HT1000to1500_2.h5"])
 if __name__ == "__main__":
-    #print(sys.argv[1], sys.argv[2:])
-    merge_multiple(sys.argv[1], sys.argv[2:])
+    output = sys.argv[1]
+    inputs = [glob.glob(x)[0] for x in sys.argv[2:]]
+    merge_multiple(output , inputs)
     
     print("Done!")
 

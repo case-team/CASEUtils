@@ -1,5 +1,6 @@
 from H5_maker import * 
 from ttbar_h5_maker import *
+from utils import *
 import glob
 
 
@@ -22,7 +23,7 @@ if(options.flag == -1234):
     exit(1)
 
 if(".root" in options.fin): input_files = [options.fin]
-else: input_files = glob.glob(options.fin + "*.root")
+else: input_files = get_file_list(options.fin)
 
 if(options.ttbar):
     NanoReader_TTbar(options.flag, inputFileNames = input_files, outputFileName = options.fout, json = options.json, year = str(options.year), 

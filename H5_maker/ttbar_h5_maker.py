@@ -462,11 +462,15 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
 
         inputFile = TFile.Open(fileName)
         if(not inputFile): #check for null pointer
-            print("Unable to open file %s, exting \n" % fileName)
-            return 1
+            print("Unable to open file %s, skipping \n" % fileName)
+            continue
 
         #get input tree
-        TTree = inputFile.Get("Events")
+        try:
+            TTree = inputFile.Get("Events")
+        except:
+            print("Unable to get contents from file %s, skipping \n" % fileName)
+            continue
 
         # pre-skimming
         if(json != ''):
