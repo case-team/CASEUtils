@@ -450,11 +450,9 @@ def get_rebinning(binsx, histos_sb, min_count = 5):
         else:
             rebins.pop(below_bins[-1])
 
-    print("new bins:", rebins)
-    #h_rebin.Print("range")
-    #exit(1)
-    print("Done with rebinning!")
-    h_rebin.Print("all")
+    #print("new bins:", rebins)
+    #print("Done with rebinning!")
+    #h_rebin.Print("all")
 
     return rebins
 

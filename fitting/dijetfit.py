@@ -236,11 +236,8 @@ def dijetfit(options):
         qcd_outfile = ROOT.TFile(qcd_fnames[i], 'RECREATE')
 
         model_name = "model_b" + str(i)
-        print("Fitter")
         fitter_QCD = Fitter(['mjj_fine'], debug = False)
-        print("Shape")
         fitter_QCD.qcdShape(model_name, 'mjj_fine', nPars)
-        print("import")
         fitter_QCD.importBinnedData(fitting_histogram, ['mjj_fine'], data_name)
         
         #Running fit two times seems to improve things (better initial guesses for params?)
@@ -260,7 +257,6 @@ def dijetfit(options):
         qcd_outfile.cd()
 
         mjj = fitter_QCD.getVar('mjj_fine')
-        print("nbins_fine", nbins_fine)
         mjj.setBins(nbins_fine)
         model = fitter_QCD.getFunc(model_name)
         dataset = fitter_QCD.getData(data_name)
