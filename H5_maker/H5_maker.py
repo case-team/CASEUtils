@@ -7,6 +7,7 @@ import h5py
 from optparse import OptionParser
 import sys
 import utils
+from gen_utils import *
 
 
 from PhysicsTools.NanoAODTools.postprocessing.framework.datamodel import *
@@ -59,8 +60,6 @@ JME_vars_map = {
 
 
 
-
-
 def nPFCounter(index, event):
     count = 0
     jet_indices = event.FatJetPFCands_jetIdx
@@ -86,7 +85,7 @@ def get_branch_mean(inTree, branch_name):
 
 class Outputer:
     def __init__(self, outputFileName="out.root", batch_size = 5000, truth_label = 0, sample_type="MC", 
-            sort_pfcands = False, include_systematics = True, do_top_ptrw = False, year = 2017):
+            sort_pfcands = False, include_systematics = True, do_top_ptrw = False, year = 2017, gen_label = ""):
 
         self.batch_size = batch_size
         self.output_name = outputFileName
@@ -102,6 +101,13 @@ class Outputer:
         self.n_SVs = 10 #how many SVs candidates to save (max)
         self.sort_pfcands = sort_pfcands
         self.year = year
+        self.gen_label = gen_label
+        self.gen_size = 1
+        if(self.gen_label != ""):
+            if(self.gen_label not in gen_dict.keys()):
+                print("Gen label %s not supported!" % self.gen_label)
+                exit(1)
+            self.gen_size, self.gen_parser = gen_dict[self.gen_label]
         self.reset()
 
     def reset(self):
@@ -117,6 +123,8 @@ class Outputer:
         self.sys_weights = np.zeros((self.batch_size, 21), dtype=np.float32)
         self.jet1_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
         self.jet2_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
+        self.jet2_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
+        self.gen_info = np.zeros((self.batch_size, self.gen_size, 4), dtype = np.float32)
 
 
     def is_leptonic_decay(self, event):
@@ -182,12 +190,19 @@ class Outputer:
         else:
             genWeight = inTree.readBranch('genWeight')
             leptonic_decay = self.is_leptonic_decay(event)
+
+
+        if(self.gen_label != ""):
+            gen_parts = self.gen_parser(event)
+            #print(gen_parts)
+            self.gen_info[self.idx] = np.array(gen_parts, dtype= np.float32)
+
         
         MET = inTree.readBranch('MET_pt')
         MET_phi = inTree.readBranch('MET_phi')
         eventNum = inTree.readBranch('event')
         run = inTree.readBranch('run')
-        SVs = Collection(event, 'FatJetSVs')
+        #SVs = Collection(event, 'FatJetSVs')
 
         event_info = [eventNum, MET, MET_phi, genWeight, leptonic_decay, run, self.year, num_jets]
 
@@ -283,7 +298,6 @@ class Outputer:
             self.jet2_JME_vars[self.idx] = jet2.JME_vars
 
 
-            
 
 
 
@@ -296,6 +310,9 @@ class Outputer:
 
 
         jet_kinematics = [mjj, d_eta, jet1.pt_corr, jet1.eta, jet1.phi, jet1.msoftdrop_corr, jet2.pt_corr, jet2.eta, jet2.phi, jet2.msoftdrop_corr]
+
+        #print("is_lep", leptonic_decay)
+        #print("reco", jet1.msoftdrop_corr, jet2.msoftdrop_corr, mjj)
 
         if(jet3 != None):
             jet_kinematics.extend([jet3.pt, jet3.eta, jet3.phi, jet3.msoftdrop])
@@ -336,24 +353,24 @@ class Outputer:
             jet2_PFCands.append([cand.Px(), cand.Py(), cand.Pz(), cand.E()])
 
         #SV's
-        jet1_SVs = []
-        jet2_SVs = []
+        #jet1_SVs = []
+        #jet2_SVs = []
 
-        for SV in SVs:
-            SV_vec = [SV.mass, SV.pt, SV.ntracks, SV.normchi2, SV.dxysig, SV.d3dsig]
-            if(SV.jetIdx == jet1.idx):
-                jet1_SVs.append(SV_vec)
-            elif(SV.jetIdx == jet2.idx):
-                jet2_SVs.append(SV_vec)
+        #for SV in SVs:
+        #    SV_vec = [SV.mass, SV.pt, SV.ntracks, SV.normchi2, SV.dxysig, SV.d3dsig]
+        #    if(SV.jetIdx == jet1.idx):
+        #        jet1_SVs.append(SV_vec)
+        #    elif(SV.jetIdx == jet2.idx):
+        #        jet2_SVs.append(SV_vec)
 
-        j1_nSVs = min(len(jet1_SVs), self.n_SVs)
-        j2_nSVs = min(len(jet2_SVs), self.n_SVs)
+        #j1_nSVs = min(len(jet1_SVs), self.n_SVs)
+        #j2_nSVs = min(len(jet2_SVs), self.n_SVs)
 
-        jet1_SVs = jet1_SVs[:j1_nSVs]
-        jet2_SVs = jet2_SVs[:j2_nSVs]
+        #jet1_SVs = jet1_SVs[:j1_nSVs]
+        #jet2_SVs = jet2_SVs[:j2_nSVs]
 
-        if(j1_nSVs > 0): self.jet1_SVs[self.idx, :j1_nSVs] = np.array(jet1_SVs, dtype = np.float32)
-        if(j2_nSVs > 0): self.jet2_SVs[self.idx, :j2_nSVs] = np.array(jet2_SVs, dtype = np.float32)
+        #if(j1_nSVs > 0): self.jet1_SVs[self.idx, :j1_nSVs] = np.array(jet1_SVs, dtype = np.float32)
+        #if(j2_nSVs > 0): self.jet2_SVs[self.idx, :j2_nSVs] = np.array(jet2_SVs, dtype = np.float32)
 
         #print(self.jet2_SVs[self.idx])
 
@@ -396,6 +413,8 @@ class Outputer:
                 f.create_dataset("jet2_PFCands", data=self.jet2_PFCands, chunks = True, maxshape=(None, self.jet2_PFCands.shape[1], 4), compression='gzip')
                 f.create_dataset("jet1_SVs", data=self.jet1_SVs, chunks = True, maxshape=(None, self.n_SVs, 6), compression='gzip')
                 f.create_dataset("jet2_SVs", data=self.jet2_SVs, chunks = True, maxshape=(None, self.n_SVs, 6), compression='gzip')
+                if(self.gen_size > 1):
+                    f.create_dataset("gen_info", data=self.gen_info, chunks = True, maxshape=(None, self.gen_size, 4))
                 if(self.include_systematics):
                     f.create_dataset("sys_weights", data=self.sys_weights, chunks = True, maxshape=(None, self.sys_weights.shape[1]))
                     f.create_dataset("jet1_JME_vars", data=self.jet1_JME_vars, chunks = True, maxshape=(None, self.jet1_JME_vars.shape[1]))
@@ -412,6 +431,8 @@ class Outputer:
                 utils.append_h5(f,'jet2_PFCands',self.jet2_PFCands)
                 utils.append_h5(f,'jet1_SVs',self.jet1_SVs)
                 utils.append_h5(f,'jet2_SVs',self.jet2_SVs)
+                if(self.gen_size > 1):
+                    utils.append_h5(f,'gen_info',self.gen_info)
                 if(self.include_systematics):
                     utils.append_h5(f,'sys_weights',self.sys_weights)
                     utils.append_h5(f,'jet1_JME_vars',self.jet1_JME_vars)
@@ -430,6 +451,7 @@ class Outputer:
             self.event_info = self.event_info[:self.idx]
             self.jet1_SVs = self.jet1_SVs[:self.idx]
             self.jet2_SVs = self.jet2_SVs[:self.idx]
+            if(self.gen_size > 1): self.gen_info = self.gen_info[:self.idx]
             if(self.include_systematics):
                 self.sys_weights = self.sys_weights[:self.idx]
                 self.jet1_JME_vars = self.jet1_JME_vars[:self.idx]
@@ -488,7 +510,7 @@ class Outputer:
 
 
 def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.root", json = '', year = 2016, nEventsMax = -1, sampleType = "MC", 
-        sort_pfcands=True,  include_systematics = False, do_top_ptrw = False):
+        sort_pfcands=True,  include_systematics = False, do_top_ptrw = False, gen_label = ""):
     
     if not ((sampleType == "MC") or (sampleType=="data")):
         print("Error! sampleType needs to be set to either data or MC! Please set correct option and retry.")
@@ -570,7 +592,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             print('Running over %i entries \n' % nTotal)
 
         out = Outputer(outputFileName, truth_label =  process_flag, sample_type=sampleType, sort_pfcands=sort_pfcands, 
-                include_systematics = include_systematics, year = year, do_top_ptrw = do_top_ptrw)
+                include_systematics = include_systematics, year = year, do_top_ptrw = do_top_ptrw, gen_label = gen_label)
 
         if(include_systematics):
             out.get_weight_avgs(inTree)
