@@ -479,6 +479,7 @@ def dijetfit(options):
     results['sig_norm_unc'] = options.sig_norm_unc
     results['mass'] = options.mass
     results['mjj_min'] = options.mjj_min
+    results['script_options'] = vars(options)
 
     print("Saving fit results to %s" % plot_dir + "fit_results_{}.pkl".format(options.mass))
     with open(plot_dir + "fit_results_{}.pkl".format(options.mass), "w") as f:
@@ -486,7 +487,7 @@ def dijetfit(options):
         
     print("Also saving fit results to %s" % plot_dir + "fit_results_{}.json".format(options.mass))
     with open(plot_dir + "fit_results_{}.json".format(options.mass), "w") as jsonfile:
-        json.dump(results, jsonfile)
+        json.dump(results, jsonfile, indent=4)
 
     return results
 
