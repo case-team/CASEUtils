@@ -63,9 +63,8 @@ JME_vars_map = {
 def nPFCounter(index, event):
     count = 0
     jet_indices = event.FatJetPFCands_jetIdx
-    length = len(event.FatJetPFCands_jetIdx)
-    for i in range(length):
-        if jet_indices[i] == index:
+    for idx in jet_indices:
+        if idx == index:
             count += 1
     
     return count
@@ -116,8 +115,8 @@ class Outputer:
         self.jet2_PFCands = np.zeros((self.batch_size, self.n_pf_cands, 4), dtype=np.float16)
         self.jet1_SVs = np.zeros((self.batch_size, self.n_SVs,6), dtype=np.float32)
         self.jet2_SVs = np.zeros((self.batch_size, self.n_SVs, 6), dtype=np.float32)
-        self.jet1_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
-        self.jet2_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
+        self.jet1_extraInfo = np.zeros((self.batch_size, 9), dtype=np.float32)
+        self.jet2_extraInfo = np.zeros((self.batch_size, 9), dtype=np.float32)
         self.jet_kinematics = np.zeros((self.batch_size, 14), dtype=np.float32)
         self.event_info = np.zeros((self.batch_size, 8), dtype=np.float32)
         self.sys_weights = np.zeros((self.batch_size, 21), dtype=np.float32)
@@ -333,8 +332,20 @@ class Outputer:
         if(jet2.subJetIdx2 >= 0):
             jet2_btag = max(jet2_btag, subjets[jet2.subJetIdx2].btagDeepB)
 
-        jet1_extraInfo = [jet1.tau1, jet1.tau2, jet1.tau3, jet1.tau4, jet1.lsf3, jet1_btag, jet1.nPFConstituents]
-        jet2_extraInfo = [jet2.tau1, jet2.tau2, jet2.tau3, jet2.tau4, jet2.lsf3, jet2_btag, jet2.nPFConstituents]
+        eps = 1e-8
+        
+        jet1_W_score = jet1.deepTagMD_W / (jet1.deepTagMD_W + jet1.deepTagMD_QCD + eps)
+        jet1_Wkk_score = (jet1.deepTagMD_W + jet1.deepTagMD_H4q)  / ( jet1.deepTagMD_H4q + jet1.deepTagMD_W + jet1.deepTagMD_QCD + eps)
+        jet2_W_score = jet2.deepTagMD_W / (jet2.deepTagMD_W + jet2.deepTagMD_QCD + eps)
+        jet2_Wkk_score = (jet2.deepTagMD_W + jet2.deepTagMD_H4q)  / ( jet2.deepTagMD_H4q + jet2.deepTagMD_W + jet2.deepTagMD_QCD + eps)
+
+        #print(jet1.deepTagMD_W , jet1.deepTagMD_H4q, jet1.deepTagMD_QCD)
+        #print(jet1_Wkk_score)
+
+
+
+        jet1_extraInfo = [jet1.tau1, jet1.tau2, jet1.tau3, jet1.tau4, jet1.lsf3, jet1_btag, jet1.nPFConstituents, jet1_W_score, jet1_Wkk_score]
+        jet2_extraInfo = [jet2.tau1, jet2.tau2, jet2.tau3, jet2.tau4, jet2.lsf3, jet2_btag, jet2.nPFConstituents, jet2_W_score, jet2_Wkk_score]
         #print(jet1.PFConstituents_Start, jet1.PFConstituents_Start + jet1.nPFConstituents, jet2.PFConstituents_Start, jet2.PFConstituents_Start + jet2.nPFConstituents)
 
         j1_nPF = min(self.n_pf_cands, jet1.nPFConstituents)
@@ -608,7 +619,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
 # -------- Begin Loop over tree-------------------------------------
 
         entries = inTree.entries
-        for entry in xrange(entries):
+        for entry in range(entries):
 
 
             if count % 10000 == 0 :
@@ -656,7 +667,7 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
                 
 
 
-            jet_min_pt = 300
+            jet_min_pt = 200
             #keep 2 jets with pt > 200, tight id
             jet1 = jet2 = jet3 =  None
         
@@ -668,17 +679,17 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
                 #jetId : bit1 = loose, bit2 = tight, bit3 = tightLepVeto
                 #want tight id
                 #select highest two pt jets, keep track of 3rd
-                if((jet.jetId & 2 == 2) and abs(jet.eta) < 2.5):
+                if((jet.jetId & 2 == 2) and abs(jet.eta) < 2.4):
                     jet.PFConstituents_Start = pf_conts_start
-                    if(jet.pt > 50): num_jets+=1
-                    if((jet1 == None or jet.pt > jet1.pt and jet.pt > 50.)):
+                    if(jet.pt > jet_min_pt): num_jets+=1
+                    if((jet1 == None or jet.pt > jet1.pt and jet.pt > jet_min_pt)):
                         jet3 = jet2
                         jet2 = jet1
                         jet1 = jet
-                    elif((jet2 == None or jet.pt > jet2.pt and jet.pt > 50.)):
+                    elif((jet2 == None or jet.pt > jet2.pt and jet.pt > jet_min_pt)):
                         jet3 = jet2
                         jet2 = jet
-                    elif(jet3 == None or jet.pt > jet3.pt):
+                    elif(jet3 == None or jet.pt > jet3.pt and jet.pt > jet_min_pt):
                         jet3 = jet
                 
                 
@@ -694,6 +705,8 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
             
 
             if(jet1 == None or jet2 == None): continue
+            if(num_jets > 2): continue
+            if(jet1.msoftdrop < 40. or jet2.msoftdrop < 40.): continue
             if(inHEMRegion(jet1, year) or inHEMRegion(jet2, year)): continue
 
             #Order jets so jet1 is always the higher mass one
@@ -709,6 +722,9 @@ def NanoReader(process_flag, inputFileNames=["in.root"], outputFileName="out.roo
 
             dijet = jet1_4vec + jet2_4vec
             mjj = dijet.M()
+            MET = inTree.readBranch('MET_pt')
+            ST = jet1.pt + jet2.pt + MET
+            if(ST < 1100): continue
 
             jet1.pt_corr = jet1.pt
             jet2.pt_corr = jet2.pt

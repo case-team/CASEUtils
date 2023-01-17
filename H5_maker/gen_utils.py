@@ -142,7 +142,7 @@ def parse_Wkk(event):
 
 
     for i, gen_part in enumerate(GenPartsColl):
-        #print(i, gen_part.pdgId, gen_part.genPartIdxMother, gen_part.pt, gen_part.eta, gen_part.phi)
+        #print(i, gen_part.pdgId, gen_part.genPartIdxMother, gen_part.pt, gen_part.eta, gen_part.phi, gen_part.mass)
         if(isFirstCopy(gen_part.statusFlags)):
             if(abs(gen_part.pdgId) == W_ID and gen_part.genPartIdxMother >= 0):
                 m = GenPartsColl[gen_part.genPartIdxMother]
@@ -152,6 +152,7 @@ def parse_Wkk(event):
                     elif(W2 is None): W2 = gen_part
                     else: print("Extra W!")    
 
+    #exit(1)
     parent_ids = {W_ID}
 
 
