@@ -626,7 +626,7 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
                     jet_dR = deltaR(jet, sel_mu)
                     nAK4s +=1
                     #tightId and loose Pileup ID
-                    if (jet.jetId & 2 == 2 and jet.puId % 2 == 1 and (ang_dist(sel_mu.phi, jet.phi)  < ang_cut) and jet.btagDeepB > btag_cut):
+                    if (jet.jetId & 2 == 2 and jet.puId % 2 == 1 and (abs(ang_dist(sel_mu.phi, jet.phi))  < ang_cut) and jet.btagDeepB > btag_cut):
                         pass_btag = True
                         btag_jet = jet
 
@@ -648,10 +648,10 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
                 jet.idx = i
                 #jetId : bit1 = loose, bit2 = tight, bit3 = tightLepVeto
                 #want tight id
-                if((jet.jetId & 2 == 2) and abs(jet.eta) < 2.4):
+                if((jet.jetId & 2 == 2) and abs(jet.eta) < 2.5):
                     jet.PFConstituents_Start = pf_conts_start
                     if(jet.pt > 50): num_jets+=1
-                    if((j1_ak8 is None or jet.pt > j1_ak8.pt) and jet.pt > 50. and ang_dist(jet.phi, sel_mu.phi) > ang_cut):
+                    if((j1_ak8 is None or jet.pt > j1_ak8.pt) and jet.pt > 50. and abs(ang_dist(jet.phi, sel_mu.phi)) > ang_cut):
                         j1_ak8 = jet
                 
                     jet.nPFConstituents = jet.nConstituents
