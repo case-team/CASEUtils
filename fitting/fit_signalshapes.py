@@ -57,6 +57,7 @@ def fit_signals(options):
             graph.SetPoint(i, mass, val)
             graph.SetPointError(i, 0.0, err)
 
+        parameters["script_options"] = vars(options)
         sig_file_name = os.path.join(out_dir, "sig_fit_{}.json".format(mass))
         with open(sig_file_name, 'w') as f:
             json.dump(parameters, f, indent=4)
