@@ -123,7 +123,6 @@ class Outputer:
         self.sys_weights = np.zeros((self.batch_size, 21), dtype=np.float32)
         self.jet1_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
         self.jet2_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
-        self.jet2_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
         self.gen_info = np.zeros((self.batch_size, self.gen_size, 4), dtype = np.float32)
 
 
@@ -202,7 +201,7 @@ class Outputer:
         MET_phi = inTree.readBranch('MET_phi')
         eventNum = inTree.readBranch('event')
         run = inTree.readBranch('run')
-        #SVs = Collection(event, 'FatJetSVs')
+        SVs = Collection(event, 'FatJetSVs')
 
         event_info = [eventNum, MET, MET_phi, genWeight, leptonic_decay, run, self.year, num_jets]
 
@@ -353,24 +352,24 @@ class Outputer:
             jet2_PFCands.append([cand.Px(), cand.Py(), cand.Pz(), cand.E()])
 
         #SV's
-        #jet1_SVs = []
-        #jet2_SVs = []
+        jet1_SVs = []
+        jet2_SVs = []
 
-        #for SV in SVs:
-        #    SV_vec = [SV.mass, SV.pt, SV.ntracks, SV.normchi2, SV.dxysig, SV.d3dsig]
-        #    if(SV.jetIdx == jet1.idx):
-        #        jet1_SVs.append(SV_vec)
-        #    elif(SV.jetIdx == jet2.idx):
-        #        jet2_SVs.append(SV_vec)
+        for SV in SVs:
+            SV_vec = [SV.mass, SV.pt, SV.ntracks, SV.normchi2, SV.dxysig, SV.d3dsig]
+            if(SV.jetIdx == jet1.idx):
+                jet1_SVs.append(SV_vec)
+            elif(SV.jetIdx == jet2.idx):
+                jet2_SVs.append(SV_vec)
 
-        #j1_nSVs = min(len(jet1_SVs), self.n_SVs)
-        #j2_nSVs = min(len(jet2_SVs), self.n_SVs)
+        j1_nSVs = min(len(jet1_SVs), self.n_SVs)
+        j2_nSVs = min(len(jet2_SVs), self.n_SVs)
 
-        #jet1_SVs = jet1_SVs[:j1_nSVs]
-        #jet2_SVs = jet2_SVs[:j2_nSVs]
+        jet1_SVs = jet1_SVs[:j1_nSVs]
+        jet2_SVs = jet2_SVs[:j2_nSVs]
 
-        #if(j1_nSVs > 0): self.jet1_SVs[self.idx, :j1_nSVs] = np.array(jet1_SVs, dtype = np.float32)
-        #if(j2_nSVs > 0): self.jet2_SVs[self.idx, :j2_nSVs] = np.array(jet2_SVs, dtype = np.float32)
+        if(j1_nSVs > 0): self.jet1_SVs[self.idx, :j1_nSVs] = np.array(jet1_SVs, dtype = np.float32)
+        if(j2_nSVs > 0): self.jet2_SVs[self.idx, :j2_nSVs] = np.array(jet2_SVs, dtype = np.float32)
 
         #print(self.jet2_SVs[self.idx])
 
