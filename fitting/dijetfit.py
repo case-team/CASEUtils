@@ -361,7 +361,6 @@ def dijetfit(options):
         fit_errs[i] = bkg_fit_frac_err
         fitter_QCD.delete()
 
-    #TODO change to residual sum of squares NOT chi2 for f test ? 
     best_i = f_test(nParsToTry, ndofs, chi2s, fit_errs, thresh = options.ftest_thresh, err_thresh = options.err_thresh)
     nPars_QCD = nParsToTry[best_i]
     qcd_fname = qcd_fnames[best_i]
@@ -501,6 +500,7 @@ def dijetfit(options):
     results['mass'] = options.mass
     results['mjj_min'] = options.mjj_min
     results['mjj_max'] = options.mjj_max
+    results['script_options'] = vars(options)
 
     print("Saving fit results to %s" % plot_dir + "fit_results_{}.pkl".format(options.mass))
     with open(plot_dir + "fit_results_{}.pkl".format(options.mass), "w") as f:
@@ -508,7 +508,7 @@ def dijetfit(options):
         
     print("Also saving fit results to %s" % plot_dir + "fit_results_{}.json".format(options.mass))
     with open(plot_dir + "fit_results_{}.json".format(options.mass), "w") as jsonfile:
-        json.dump(results, jsonfile)
+        json.dump(results, jsonfile, indent=4)
 
     return results
 
