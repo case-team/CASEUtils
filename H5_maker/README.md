@@ -78,7 +78,7 @@ variations.
 
 Variations of the **preselection\_eff** for JES and JER systematic variations are also saved (eg `preselection_eff_JES_up`)
 
-**gen_info** (N_Prongs, 4) floags : 
+**gen_info** (N_Prongs, 4) floats : 
 If the `--gen` flag is used (followed by a label for a specific signal), additional generator level information 
 is included. For signals, generator level information (specifically the 4-vectors of the
 quarks that make each prong of the boosted jet) is needed for the Lund reweighting
