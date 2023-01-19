@@ -79,10 +79,10 @@ variations.
 Variations of the **preselection\_eff** for JES and JER systematic variations are also saved (eg `preselection_eff_JES_up`)
 
 **gen_info** (N_Prongs, 4) floags : 
-If the `--gen_label` flag is used, additional generator level information of the
+If the `--gen` flag is used (followed by a label for a specific signal), additional generator level information of the
 event under this column . For signals, generator level information (specifically the 4-vectors of the
 quarks that make each prong of the boosted jet) is needed for the Lund reweighting
-procedure. One can use the `--gen_label` flag followed by the correct flag for
+procedure. One can use the `--gen` flag followed by the correct flag for
 the signal you are running on in order to save the correct information. 
 The size of the **gen_info** column depends on the number of prongs in the signal being run on.
 The labels for the currently implemented signals are `Qstar, Wkk, Wp, XYY, ZpToTpTp, YtoHH`. 
