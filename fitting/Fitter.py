@@ -54,8 +54,8 @@ class Fitter(object):
                 #v = mmin + i * (mmax-mmin)/float(N)
                 binningx.append(axis.GetBinLowEdge(i))
             if(len(regions) == 0):
-                var.setMin(mini)
                 var.setMax(maxi)
+                var.setMin(mini)
             else:
                 for reg_name,reg_low,reg_high in regions:
                     var.setRange(reg_name, reg_low, reg_high)
@@ -240,6 +240,7 @@ class Fitter(object):
             self.w.factory("p3[2.35256e+00, -100., 100.]")
             self.w.factory("p4[4.17695e-01, -100., 100.]")
             self.w.factory("p5[1.00000e+01, -100., 100.]")
+
             model = ROOT.RooGenericPdf(name, "pow(exp(-@0/13000.),@4) *pow(1-@0/13000., @1)/ ( pow(@0/13000., @2+@3*log(@0/13000.)+@4*pow(log(@0/13000.),2)) )", 
                     ROOT.RooArgList(self.w.var(poi), self.w.var("p1"), self.w.var("p2"), self.w.var("p3"), self.w.var("p4"), self.w.var("p5")))
 

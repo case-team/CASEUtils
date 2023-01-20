@@ -108,7 +108,7 @@ def truncate(binning,mmin,mmax):
     return res
 
 
-def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvname, plot_dir, has_sig = False):
+def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvname, plot_dir, has_sig = False, plot_label = ""):
 
     c1 =ROOT.TCanvas("c1","",800,800)
     c1.SetLogy()
@@ -137,8 +137,8 @@ def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvn
     frame.SetTitle("")
     frame.Draw()
         
-    legend = ROOT.TLegend(0.45097293,0.64183362,0.6681766,0.879833)
-    legend2 = ROOT.TLegend(0.45097293,0.64183362,0.6681766,0.879833)
+    legend = ROOT.TLegend(0.45097293,0.54183362,0.6681766,0.779833)
+    legend2 = ROOT.TLegend(0.45097293,0.54183362,0.6681766,0.779833)
     legend.SetTextSize(0.046)
     legend.SetLineColor(0)
     legend.SetShadowColor(0)
@@ -180,6 +180,16 @@ def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvn
     pt.AddText("Chi2/ndf = %.2f/%i = %.2f"%(chi2,ndof,chi2/ndof))
     pt.AddText("Prob = %.3f"%ROOT.TMath.Prob(chi2,ndof))
     pt.Draw()
+
+    pt2 = ROOT.TPaveText(0.5,0.8,0.6,0.9,"NDC")
+    pt2.SetTextFont(42)
+    pt2.SetTextAlign(22)
+    pt2.SetFillColor(0)
+    pt2.SetBorderSize(0)
+    pt2.SetFillStyle(0)
+    pt2.AddText(plot_label)
+    pt2.Draw()
+
     
     c1.Update()
 
@@ -276,7 +286,7 @@ def calculateChi2(g_pulls, nPars, ranges = None, excludeZeros = True, dataHist =
         if(add):
             if (dataHist is not None ):
                 dataHist.GetPoint(p, a_x, a_data)
-                print(x, a_data[0], pull)
+                #print(x, a_data[0], pull)
             NumberOfObservations_VarBin+=1
             chi2_VarBin += pow(pull,2)
             
@@ -342,7 +352,10 @@ def fill_hist(v, h, event_num = None):
     #h.Print("range")
 
 
-
+def get_mjj_max(h_file):
+    with h5py.File(h_file, "r") as f:
+        mjj = np.array(f['mjj'][()])
+        return np.amax(mjj)
 
 
 def load_h5_sb(h_file, hist, correctStats=False, sb1_edge = -1., sb2_edge = -1.):
@@ -400,11 +413,12 @@ def check_rough_sig(h_file, m_low, m_high):
         mjj = f['mjj'][()]
         is_sig = f['truth_label'][()]
 
+    eps = 1e-6
     in_window = (mjj > m_low) & (mjj < m_high)
     sig_events = is_sig > 0.9
     bkg_events = is_sig < 0.1
-    S = mjj[sig_events & in_window].shape[0]
-    B = mjj[bkg_events & in_window].shape[0]
+    S = max(mjj[sig_events & in_window].shape[0], eps)
+    B = max(mjj[bkg_events & in_window].shape[0], eps)
     print("Mjj window %f to %f " % (m_low, m_high))
     print("S = %i, B = %i, S/B %f, sigificance ~ %.1f " % (S, B, float(S)/B, S/np.sqrt(B)))
 
@@ -414,8 +428,14 @@ def get_below_bins(h, min_count = 5):
     for i in range(2, h.GetNbinsX()+1):
         c = h.GetBinContent(i)
 
+        #width per 100 gev
+        #width = h.GetBinWidth(i) / 100.
+        #density = c / width
+        #print(i, c, density) 
+
         #remove left edge of bin if below thresh
-        if( c < min_count): out.append(i-1)
+        if( c < min_count ): out.append(i-1)
+    
     return out
 
 def get_rebinning(binsx, histos_sb, min_count = 5):
@@ -426,12 +446,12 @@ def get_rebinning(binsx, histos_sb, min_count = 5):
     while(below_min):
         h_rebin = h_rebin.Rebin(len(rebins)-1, "", array('d', rebins))
         below_bins = get_below_bins(h_rebin, min_count = min_count)
-        if(len(below_bins) <= 1): below_min = False
+        if(len(below_bins) < 1): below_min = False
         else:
             rebins.pop(below_bins[-1])
 
-    #print("Done with rebinning!")
     #print("new bins:", rebins)
+    #print("Done with rebinning!")
     #h_rebin.Print("all")
 
     return rebins
@@ -441,7 +461,7 @@ def get_rebinning(binsx, histos_sb, min_count = 5):
 
 
     
-def checkSBFit(filename,label,roobins,plotname, nPars, plot_dir):
+def checkSBFit(filename,label,roobins,plotname, nPars, plot_dir, plot_label = ""):
     
     fin = ROOT.TFile.Open(filename,'READ')
     workspace = fin.w
@@ -532,13 +552,13 @@ def checkSBFit(filename,label,roobins,plotname, nPars, plot_dir):
     #chi2,ndof = calculateChi2(hpull, nPars +1)
 
     pdf_names = ["model_s"] 
-    PlotFitResults(frame,fres.GetName(),nPars+1,frame3,"data_obs", pdf_names,chi2,ndof,'sbFit_'+plotname, plot_dir, has_sig = True)
+    PlotFitResults(frame,fres.GetName(),nPars+1,frame3,"data_obs", pdf_names,chi2,ndof,'sbFit_'+plotname, plot_dir, has_sig = True, plot_label = plot_label)
 
     print "chi2,ndof are", chi2, ndof
     return chi2, ndof
 
 
-def f_test(nParams, nDof, chi2, thresh = 0.05):
+def f_test(nParams, nDof, chi2, fit_errs, thresh = 0.05, err_thresh = 0.5):
     #assumes arrays are in increasing number of params order (ie nParams[0] is minimum number of params)
     print  "\n\n #################### STARTING F TEST #######################" 
     best_i = 0
@@ -559,8 +579,17 @@ def f_test(nParams, nDof, chi2, thresh = 0.05):
         print("Base chi2 was %.1f, new is %.1f" % (chi2_base, chi2_new))
         print("F is %.2f, prob is %.3f" % (F, prob))
 
-        if(prob < thresh):
-            print("Prob below threshold, switching to %i parameters" % nDof_new)
-            best_i = i
+        if(prob < thresh ):
+            if(fit_errs[i] <  err_thresh or fit_errs[i] < fit_errs[best_i]):
+                print("Prob below threshold, switching to %i parameters" % nParams[i])
+                best_i = i
+            else:
+                print("Prob below threshold, but largest param error is too large(%.2f) so NOT adding parameters" % fit_errs[i])
+
+        elif(fit_errs[best_i]  > err_thresh and fit_errs[i] < err_thresh):
+                print("Prob not below threshold but previous best was above error threshold, so switch to %i params" % nParams[i])
+                best_i = i
+
+
 
     return best_i
