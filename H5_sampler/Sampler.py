@@ -1,5 +1,9 @@
 import h5py
 import numpy as np 
+from sys import exit
+
+SCALAR_KEYS = ["preselection_eff", "d_eta_eff", "preselection_eff_JER_down", "preselection_eff_JER_up", "preselection_eff_JES_down", "preselection_eff_JES_up"]
+
 
 class Sampler():
     def __init__(self, filename, xsec, lumi, holdout_frac = 0., isSignal = False):
@@ -29,8 +33,6 @@ class Sampler():
                    )
             self.with_replacement = True
 
-
-
     def setup_batch(self, iBatch = 0, nBatches = 1):    
         #setup sampler so it can have the same random sample for all the keys in this batch
         
@@ -54,8 +56,17 @@ class Sampler():
 
         if(self.nSample < 1): return []
         with h5py.File(self.filename, "r") as h5_file:
-            #print(self.filename, n_batch_sample, n_chunk_size)
             out = h5_file[key][self.chunk_start:self.chunk_end][self.sample_idxs]
+            return out
+
+    def sample_scalar(self, key):
+        if(key not in self.keys):
+            print("Error! Key %s not in list of keys for file %s. Keys are: \n" % (key, self.filename))
+            print(self.keys)
+            exit(1)
+
+        with h5py.File(self.filename, "r") as h5_file:
+            out = h5_file[key][:][0]
             return out
 
     def holdout(self, key):
@@ -69,6 +80,59 @@ class Sampler():
             return out
 
 
+class MaxMultiSampler():
+    """
+    This class is essentially a container for multiple Sampler instances.
+    It puts together multiple files with their own individual Sampler each.
+    The Sampler's have a relative event count given by the given luminosities.
+    And Their absolute count is determined by the maximum number of events
+    that the input files have while respecting the relative composition.
+    """
+    def __init__(self, filename_list, lumi_list):
+        self.filename_list = filename_list
+        self.lumi_list = lumi_list
+        assert len(filename_list) == len(lumi_list)
+
+        # get the number of available evs and the normalized target composition
+        event_counts = []
+        composition = []
+        for filename, lumi in zip(filename_list, lumi_list):
+            with h5py.File(filename, "r") as h5_file:
+                event_counts.append(h5_file['event_info'].shape[0])
+                composition.append(h5_file['preselection_eff'][0] * lumi)
+
+        norm_factor = sum(composition)
+        for i in range(len(composition)):
+            composition[i] /= norm_factor
+
+        self.event_counts = event_counts
+        self.composition = composition
+
+        # compute largest possible event number from all samples
+        evt_comp_ratios = [event_counts[i]/composition[i]
+                           for i in range(len(event_counts))]
+        min_ratio = min(evt_comp_ratios)
+        target_event_counts = [weight*min_ratio for weight in composition]
+        self.target_event_counts = target_event_counts
+
+        # collect the samplers to be put into a BlackBox
+        samplers = []
+        for filename, lumi, n_events in zip(filename_list, lumi_list,
+                                            target_event_counts):
+            samplers.append(Sampler(filename,
+                                    # Sampler will multiply the lumi again
+                                    n_events/lumi,
+                                    lumi,
+                                    # Needs to be set to avoid re-multiplying
+                                    #   the preselection efficiency
+                                    isSignal=True,
+                                    holdout_frac=-1))
+        self.samplers = samplers
+
+    def get_samplers(self):
+        return self.samplers
+
+
 class BlackBox():
     def __init__(self, samplers, keys = [], nBatches = 1):
         self.data = dict()
@@ -77,8 +141,9 @@ class BlackBox():
         if(len(keys) == 0):
             #empty list means keep everything
             self.keys = (self.samplers[0]).keys
-            if "preselection_eff" in self.keys:
-                self.keys.remove('preselection_eff')
+            # for key in SCALAR_KEYS:
+            #     if key in self.keys:
+            #         self.keys.remove(key)
         else:
             self.keys = keys
 
@@ -92,10 +157,6 @@ class BlackBox():
 
         self.nBatches = nBatches
 
-
-
-
-
     def writeOut(self, filename, batch_start =0):
 
         print("Creating a blackbox with %i events in %i batches" % (self.nEvents, self.nBatches))
@@ -104,7 +165,12 @@ class BlackBox():
             print("Starting batch %i \n" % i)
             shuffle_order = np.arange(evts_per_batch)
 
-            f_batch =  filename + "_batch%i.h5" % i
+            if self.nBatches == 1:
+                f_batch = filename
+                if not f_batch.endswith(".h5"):
+                    f_batch =  filename + ".h5"
+            else:
+                f_batch =  filename + "_batch%i.h5" % i
             np.random.shuffle(shuffle_order)
 
             for sam in self.samplers: #setup the sampler for this batch
@@ -115,16 +181,23 @@ class BlackBox():
                 print("Getting data for key %s " % key)
                 
                 for j,sam in enumerate(self.samplers):
-                    if(j==0): 
-                        self.data[key] = sam.sample(key)
-
+                    if key in SCALAR_KEYS:
+                        if j == 0:
+                            self.data[key] = sam.nSample * sam.sample_scalar(key)
+                        else:
+                            self.data[key] += sam.nSample * sam.sample_scalar(key)
                     else:
-                        self.data[key] = np.append(self.data[key], sam.sample(key), axis = 0)
+                        if j == 0: 
+                            self.data[key] = sam.sample(key)
 
-
-                #Shuffle the order
-                self.data[key] = self.data[key][shuffle_order]
-
+                        else:
+                            self.data[key] = np.append(self.data[key], sam.sample(key), axis = 0)
+                if key in SCALAR_KEYS:
+                    # weighted average and transforming to np array scalar
+                    self.data[key] = np.array([self.data[key] / self.nEvents])
+                else:
+                    #Shuffle the order
+                    self.data[key] = self.data[key][shuffle_order]
 
             print("Writing out to file %s" % f_batch)
             with h5py.File(f_batch, "w") as f:
@@ -155,6 +228,3 @@ class BlackBox():
                 shape = list(self.holdout[key].shape)
                 shape[0] = None
                 f.create_dataset(key, data = self.holdout[key], chunks = True, maxshape = shape,   compression = 'gzip')
-
-
-
