@@ -43,15 +43,6 @@ for year in years:
     h5_files[year] = {x for x in os.listdir(join(base_dir, year, subdir))
                       if x.endswith(".h5")}
 
-signal_file_list = []
-for candidate in h5_files[years[0]]:
-    add_candidate = True
-    for year in years[1:]:
-        if candidate not in h5_files[year]:
-            add_candidate = False
-    if add_candidate:
-        signal_file_list.append(candidate)
-
 # Find signals present in all years
 signal_file_list = list(set.intersection(*h5_files.values()))
 signal_file_list.sort()
