@@ -321,7 +321,7 @@ def dijetfit(options):
         my_chi2, my_ndof = calculateChi2(hpull, nPars, excludeZeros = True, dataHist = dhist)
         my_prob = ROOT.TMath.Prob(my_chi2, my_ndof)
         PlotFitResults(frame, fres.GetName(), nPars, framePulls, data_name,
-                       model_name, my_chi2, my_ndof,
+                       [model_name], my_chi2, my_ndof,
                        str(nPars) + "par_qcd_fit_binned{}".format(
                            "_blinded" if options.blinded else ""),
                        plot_dir, plot_label = label)

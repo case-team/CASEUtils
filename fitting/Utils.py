@@ -108,7 +108,7 @@ def truncate(binning,mmin,mmax):
     return res
 
 
-def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvname, plot_dir, has_sig = False, plot_label = ""):
+def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvname, plot_dir, has_sig = False, draw_sig = False, plot_label = ""):
 
     c1 =ROOT.TCanvas("c1","",800,800)
     c1.SetLogy()
@@ -156,14 +156,18 @@ def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvn
     legend2.SetFillStyle(0)
     legend2.SetMargin(0.35)
     legend.AddEntry(frame.findObject(data_name),"Data","lpe")
-    if(not has_sig): 
-        legend.AddEntry(frame.findObject(pdf_names[0]),"%i par. background fit"%nPars,"l")
+    if(len(pdf_names[0]) > 1):
+        fit_name = pdf_names[0]
+    else: fit_name = pdf_names
+    if(not has_sig or not draw_sig): 
+        legend.AddEntry(frame.findObject(fit_name),"%i par. background fit"%nPars,"l")
+        legend2.AddEntry("","","")
+        legend2.AddEntry("","","")
+        legend2.AddEntry("","","")
 
     else: 
-        legend.AddEntry(frame.findObject(pdf_names[0]),"Signal + Background Fit ","l")
-    legend2.AddEntry("","","")
-    legend2.AddEntry("","","")
-    legend2.AddEntry("","","")
+        legend.AddEntry(frame.findObject(fit_name),"Signal + Background Fit ","l")
+        legend.AddEntry(frame.findObject(pdf_names[1]),"Signal ","l")
     legend2.AddEntry("","","")
     legend2.AddEntry(frame.findObject(fitErrs),"","f")
     legend2.AddEntry("","","")
@@ -177,8 +181,9 @@ def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvn
     pt.SetFillColor(0)
     pt.SetBorderSize(0)
     pt.SetFillStyle(0)
-    pt.AddText("Chi2/ndf = %.2f/%i = %.2f"%(chi2,ndof,chi2/ndof))
-    pt.AddText("Prob = %.3f"%ROOT.TMath.Prob(chi2,ndof))
+    if(ndof > 0): 
+        pt.AddText("Chi2/ndf = %.2f/%i = %.2f"%(chi2,ndof,chi2/ndof))
+        pt.AddText("Prob = %.3f"%ROOT.TMath.Prob(chi2,ndof))
     pt.Draw()
 
     pt2 = ROOT.TPaveText(0.5,0.8,0.6,0.9,"NDC")
@@ -461,7 +466,7 @@ def get_rebinning(binsx, histos_sb, min_count = 5):
 
 
     
-def checkSBFit(filename,label,roobins,plotname, nPars, plot_dir, plot_label = ""):
+def checkSBFit(filename,label,roobins,plotname, nPars, plot_dir, draw_sig, plot_label = ""):
     
     fin = ROOT.TFile.Open(filename,'READ')
     workspace = fin.w
@@ -472,7 +477,6 @@ def checkSBFit(filename,label,roobins,plotname, nPars, plot_dir, plot_label = ""
     model_sig = workspace.pdf(sig_name)
     var = workspace.var('mjj')
     data = workspace.data('data_obs')
-    data.Print("V")
 
 
 
@@ -523,6 +527,8 @@ def checkSBFit(filename,label,roobins,plotname, nPars, plot_dir, plot_label = ""
     model.getPdf('JJ_%s'%label).plotOn(frame,ROOT.RooFit.VisualizeError(fres,1),ROOT.RooFit.FillColor(ROOT.kRed-7),ROOT.RooFit.LineColor(ROOT.kRed-7),ROOT.RooFit.Name(fres.GetName()),
             fit_norm)
     model.getPdf('JJ_%s'%label).plotOn(frame,ROOT.RooFit.LineColor(ROOT.kRed+1),ROOT.RooFit.Name("model_s"), fit_norm)
+    if(draw_sig):
+        model.getPdf('JJ_%s'%label).plotOn(frame,ROOT.RooFit.Components("shapeSig_model_signal_mjj_JJ_raw"), ROOT.RooFit.LineColor(ROOT.kBlue),ROOT.RooFit.Name("Signal"), fit_norm)
 
     #model_qcd.plotOn(frame,ROOT.RooFit.VisualizeError(fres,1),ROOT.RooFit.FillColor(ROOT.kGreen-7),ROOT.RooFit.LineColor(ROOT.kGreen-7), ROOT.RooFit.Name("Background"))
     #model_qcd.plotOn(frame,ROOT.RooFit.LineColor(ROOT.kRed+1),ROOT.RooFit.Name("Background"))
@@ -551,8 +557,8 @@ def checkSBFit(filename,label,roobins,plotname, nPars, plot_dir, plot_label = ""
 
     #chi2,ndof = calculateChi2(hpull, nPars +1)
 
-    pdf_names = ["model_s"] 
-    PlotFitResults(frame,fres.GetName(),nPars+1,frame3,"data_obs", pdf_names,chi2,ndof,'sbFit_'+plotname, plot_dir, has_sig = True, plot_label = plot_label)
+    pdf_names = ["model_s", "Signal"] 
+    PlotFitResults(frame,fres.GetName(),nPars+1,frame3,"data_obs", pdf_names,chi2,ndof,'sbFit_'+plotname, plot_dir, has_sig = True, draw_sig = draw_sig, plot_label = plot_label)
 
     print "chi2,ndof are", chi2, ndof
     return chi2, ndof
