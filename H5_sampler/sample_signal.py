@@ -54,6 +54,7 @@ for signal_name in signal_file_list:
     lumi_list = [lumies[year] for year in years]
     multi_sampler = MaxMultiSampler(sig_list, lumi_list)
 
-    BB = BlackBox(multi_sampler.get_samplers(), keys=[], nBatches=1)
+    BB = BlackBox(multi_sampler.get_samplers(), keys=[], nBatches=1,
+                  scalar_keys=multi_sampler.get_scalar_keys())
     f_out_name = join(out_dir, signal_name.replace(".h5", ""))
     BB.writeOut(f_out_name)

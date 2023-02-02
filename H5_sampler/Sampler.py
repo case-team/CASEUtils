@@ -2,8 +2,6 @@ import h5py
 import numpy as np 
 from sys import exit
 
-SCALAR_KEYS = ["preselection_eff", "d_eta_eff", "preselection_eff_JER_down", "preselection_eff_JER_up", "preselection_eff_JES_down", "preselection_eff_JES_up"]
-
 
 class Sampler():
     def __init__(self, filename, xsec, lumi, holdout_frac = 0., isSignal = False):
@@ -96,10 +94,17 @@ class MaxMultiSampler():
         # get the number of available evs and the normalized target composition
         event_counts = []
         composition = []
+        scalar_keys_dict = {}
         for filename, lumi in zip(filename_list, lumi_list):
+            scalar_keys_dict[filename] = set()
             with h5py.File(filename, "r") as h5_file:
                 event_counts.append(h5_file['event_info'].shape[0])
                 composition.append(h5_file['preselection_eff'][0] * lumi)
+                for key in h5_file.keys():
+                    if h5_file[key].shape[0] == 1:
+                        scalar_keys_dict[filename].add(key)
+        
+        self.scalar_keys = list(set.intersection(*scalar_keys_dict.values()))
 
         norm_factor = sum(composition)
         for i in range(len(composition)):
@@ -132,18 +137,21 @@ class MaxMultiSampler():
     def get_samplers(self):
         return self.samplers
 
+    def get_scalar_keys(self):
+        return self.scalar_keys
+
 
 class BlackBox():
-    def __init__(self, samplers, keys = [], nBatches = 1):
+    def __init__(self, samplers, keys = [], nBatches=1,
+                 scalar_keys=["preselection_eff"]):
         self.data = dict()
         self.holdout = dict()
         self.samplers = samplers
+        self.scalar_keys = scalar_keys
+
         if(len(keys) == 0):
             #empty list means keep everything
             self.keys = (self.samplers[0]).keys
-            # for key in SCALAR_KEYS:
-            #     if key in self.keys:
-            #         self.keys.remove(key)
         else:
             self.keys = keys
 
@@ -181,7 +189,7 @@ class BlackBox():
                 print("Getting data for key %s " % key)
                 
                 for j,sam in enumerate(self.samplers):
-                    if key in SCALAR_KEYS:
+                    if key in self.scalar_keys:
                         if j == 0:
                             self.data[key] = sam.nSample * sam.sample_scalar(key)
                         else:
@@ -192,7 +200,7 @@ class BlackBox():
 
                         else:
                             self.data[key] = np.append(self.data[key], sam.sample(key), axis = 0)
-                if key in SCALAR_KEYS:
+                if key in self.scalar_keys:
                     # weighted average and transforming to np array scalar
                     self.data[key] = np.array([self.data[key] / self.nEvents])
                 else:
