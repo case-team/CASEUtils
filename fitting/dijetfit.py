@@ -422,7 +422,7 @@ def dijetfit(options):
     print(cmd)
     os.system(cmd)
     sbfit_chi2, sbfit_ndof = checkSBFit('workspace_JJ_{l1}_{l2}.root'.format(l1=label, l2=sb_label),
-               sb_label, roobins, label + "_" + sb_label, nPars_QCD, plot_dir, plot_label = label)
+               sb_label, roobins, label + "_" + sb_label, nPars_QCD, plot_dir, draw_sig = options.draw_sig, plot_label = label)
 
     sbfit_prob = ROOT.TMath.Prob(sbfit_chi2, sbfit_ndof)
 
@@ -541,6 +541,8 @@ def fitting_options():
                       help="Where to put the plots")
     parser.add_option("-l", "--label", dest="label", default='test',
                       help="Label for file names")
+    parser.add_option("--draw_sig", dest="draw_sig", default=False,
+                      action = 'store_true', help="Draw separate signal contribution on S+B fit plots")
     parser.add_option("-b", "--blinded", dest="blinded", action="store_true",
                       default=False,
                       help="Blinding the signal region for the fit.")
