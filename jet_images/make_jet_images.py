@@ -76,6 +76,8 @@ else:
         if('j2_images' in fin.keys()):
             print("deleting existing j2 images")
             del fin['j2_images']
+    j1_PFCands = fin['jet1_PFCands']
+    j2_PFCands = fin['jet2_PFCands']
     fout = fin
 
 total_size = j1_PFCands.shape[0]
