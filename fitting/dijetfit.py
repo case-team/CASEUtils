@@ -242,7 +242,6 @@ def dijetfit(options):
         fitter_QCD.importBinnedData(fitting_histogram, ['mjj_fine'], data_name)
         
         #Running fit two times seems to improve things (better initial guesses for params?)
-        
         fres = fitter_QCD.fit(model_name, data_name, options=[ROOT.RooFit.Save(1), ROOT.RooFit.Verbose(0),  ROOT.RooFit.Minos(1)])
         fres = fitter_QCD.fit(model_name, data_name, options=[ROOT.RooFit.Save(1), ROOT.RooFit.Verbose(0),  ROOT.RooFit.Minos(1)])
 
@@ -555,8 +554,6 @@ def fitting_options():
                       help="Where to put the plots")
     parser.add_option("-l", "--label", dest="label", default='test',
                       help="Label for file names")
-    parser.add_option("--draw_sig", dest="draw_sig", default=False,
-                      action = 'store_true', help="Draw separate signal contribution on S+B fit plots")
     parser.add_option("--no_draw_sig", dest="draw_sig", action = 'store_false', help="Don't draw separate signal and bkg contribution on S+B fit plots")
     parser.set_defaults(draw_sig = True)
     parser.add_option("-b", "--blinded", dest="blinded", action="store_true",

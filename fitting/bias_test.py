@@ -1,7 +1,8 @@
 import os
 from Fitter import Fitter
 from DataCardMaker import DataCardMaker
-from Utils import *
+import Utils as utils
+import numpy as np
 from array import array
 import pickle
 import json
@@ -16,7 +17,6 @@ tdrstyle.setTDRStyle()
 ROOT.gROOT.SetBatch(True)
 ROOT.RooRandom.randomGenerator().SetSeed(random.randint(0, 1e+6))
 
-#from dijetfit import *
 
 
 
@@ -45,7 +45,7 @@ def bias_test(options):
              6100, 6400, 6800]
 
     if(options.mjj_max < 0. and options.rebin): 
-        options.mjj_max = get_mjj_max(options.inputFile) + 5.0
+        options.mjj_max = utils.get_mjj_max(options.inputFile) + 5.0
         options.mjj_max = max(1.2*options.mass, options.mjj_max)
     #print("MJJ MAX %.2f" % options.mjj_max)
     
@@ -78,7 +78,7 @@ def bias_test(options):
 
     # round to smallest precision we are storing mass values with, otherwise
     # get weird effects related to bin size
-    roundTo(binsx, fine_bin_size)
+    utils.roundTo(binsx, fine_bin_size)
 
 
 
@@ -87,14 +87,14 @@ def bias_test(options):
     histos_sb = ROOT.TH1F("mjj_sb", "mjj_sb" ,nbins_fine, binsx[0], binsx[-1])
     
     
-    load_h5_sb(options.inputFile, histos_sb)
+    utils.load_h5_sb(options.inputFile, histos_sb)
     print("************ Found %i total events \n" % histos_sb.GetEntries())
     num_evts = histos_sb.GetEntries()
 
     
 
     if(options.rebin):
-        bins_nonzero = get_rebinning(binsx, histos_sb)
+        bins_nonzero = utils.get_rebinning(binsx, histos_sb)
         print("Rebinning to avoid zero bins!")
         print("old", binsx)
         print("new", bins_nonzero)
@@ -103,20 +103,12 @@ def bias_test(options):
         bins = binsx
     roobins = ROOT.RooBinning(len(bins)-1, array('d', bins), "mjjbins")
 
-    if(options.refit_sig):
-        print ("########## FIT SIGNAL AND SAVE PARAMETERS ############")
-        sig_file_name = "sig_fit.root"
 
-        fit_signalmodel(options.inputFile, sig_file_name, mass, binsx, nbins_fine, plot_dir,return_fit=False,
-                        dcb_model=options.dcb_model)
+    if(not os.path.exists(options.sig_shape)):
+        print("Sig file %s doesn't exist" % options.sig_shape)
+        exit(1)
+    sig_file_name = options.sig_shape
 
-    else:  # use precomputed signal shape
-        if(not os.path.exists(options.sig_shape)):
-            print("Sig file %s doesn't exist" % options.sig_shape)
-            exit(1)
-        sig_file_name = options.sig_shape
-
-    print("\n\n ############# FIT BACKGROUND WITH ALT FUNCTION ###########")
 
 
 
@@ -215,9 +207,9 @@ def bias_test(options):
 
 
 
-    my_chi2, my_ndof = calculateChi2(hpull, nPars, excludeZeros = True, dataHist = dhist)
+    my_chi2, my_ndof = utils.calculateChi2(hpull, nPars, excludeZeros = True, dataHist = dhist)
     my_prob = ROOT.TMath.Prob(my_chi2, my_ndof)
-    PlotFitResults(frame, fres.GetName(), nPars, framePulls, data_name,
+    utils.PlotFitResults(frame, fres.GetName(), nPars, framePulls, data_name,
                    [model_name], my_chi2, my_ndof,
                    "altBkg_qcd_fit_binned",
                    plot_dir, plot_label = label)
@@ -321,6 +313,7 @@ def bias_test(options):
     SB_fit_pdf.plotOn(frame_toy, ROOT.RooFit.VisualizeError(fit_res, 1), ROOT.RooFit.FillColor(ROOT.kRed - 7), ROOT.RooFit.LineColor(ROOT.kRed - 7), ROOT.RooFit.Name(fit_res.GetName()), 
                    fit_norm)
 
+    SB_fit_pdf.plotOn(frame_toy,  ROOT.RooFit.Components(reg_model_name), ROOT.RooFit.LineColor(ROOT.kMagenta + 3),ROOT.RooFit.Name("Background"), fit_norm)
     SB_fit_pdf.plotOn(frame_toy, ROOT.RooFit.LineColor(ROOT.kRed + 1), ROOT.RooFit.Name("SB_fit"),  fit_norm)
 
 
@@ -348,8 +341,8 @@ def bias_test(options):
 
 
 
-    PlotFitResults(frame_toy, fit_res.GetName(), nPars, frame_toyPulls, toy_data_name,
-                   ["SB_fit", "Signal"] , chi2, -1, "fit_toy1_%s" % label,
+    utils.PlotFitResults(frame_toy, fit_res.GetName(), nPars, frame_toyPulls, toy_data_name,
+                   ["SB_fit", "Signal", "Background"] , chi2, -1, "fit_toy1_%s" % label,
                    plot_dir, plot_label = label, has_sig = True, draw_sig = True)
 
 
@@ -475,9 +468,6 @@ def fitting_options():
                       help="Threshold on fit unc to be included in f-test")
     parser.add_option("-s", "--sig_shape", default="signal_shape_m2500.root",
                       help="Pre-saved signal shape")
-    parser.add_option("--refit_sig", default=False, action="store_true",
-                      help="""Fit the signal events (using truth labels)
-                      to get signal shape""")
     parser.add_option("--rebin", default=False, action="store_true",
                       help="""Rebin dijet bins to make sure no bins less than 5 evts""")
     parser.add_option("-M", "-M", dest="mass", type=float, default=2500.,
