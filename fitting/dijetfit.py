@@ -215,6 +215,7 @@ def dijetfit(options):
     #nParsToTry = [2, 3, 4, 5]
     nParsToTry = [2, 3, 4]
     chi2s = [0]*len(nParsToTry)
+    fit_params = [0] * len(nParsToTry)
     ndofs = [0]*len(nParsToTry)
     probs = [0]*len(nParsToTry)
     fit_errs = [0]*len(nParsToTry)
@@ -332,7 +333,7 @@ def dijetfit(options):
 
 
 
-
+        bkg_fit_params = dict()
         #largest_frac_err = 0.
         for var, graph in graphs.iteritems():
             print(var)
@@ -341,6 +342,9 @@ def dijetfit(options):
             graph.SetPointError(0, 0.0, error)
             #frac_err = abs(error/value)
             #largest_frac_err = max(frac_err, largest_frac_err)
+        
+        bkg_fit_params['cov'] = convert_matrix(fres.covarianceMatrix())
+        print(bkg_fit_params['cov'])
 
         qcd_outfile.cd()
         for name, graph in graphs.iteritems():
@@ -358,6 +362,7 @@ def dijetfit(options):
         chi2s[i] = my_chi2
         ndofs[i] = my_ndof
         probs[i] = my_prob
+        fit_params[i] = bkg_fit_params
         fit_errs[i] = bkg_fit_frac_err
         fitter_QCD.delete()
 
@@ -484,6 +489,7 @@ def dijetfit(options):
     results['bkgfit_ndof'] = ndofs[best_i]
     results['bkgfit_prob'] = probs[best_i]
     results['bkgfit_frac_err'] = fit_errs[best_i]
+    results['bkg_fit_params'] = fit_params[best_i]
     results['sbfit_chi2'] = sbfit_chi2
     results['sbfit_ndof'] = sbfit_ndof
     results['sbfit_prob'] = sbfit_prob

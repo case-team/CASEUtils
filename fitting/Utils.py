@@ -84,7 +84,11 @@ def get_palette(mode):
   palette['gv'].append(c)
  
  return palette[mode]
- 
+
+def convert_matrix(mat):
+    mat_arr = mat.GetMatrixArray()
+    return [[mat_arr[i + j*mat.GetNrows()] for j in range(mat.GetNcols())] for i in range(mat.GetNrows())]
+
 def getBinning(binsMVV,minx,maxx,bins):
     l=[]
     if binsMVV=="":
