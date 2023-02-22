@@ -277,7 +277,7 @@ def dijetfit(options):
         dataset.plotOn(frame, ROOT.RooFit.Name(data_name), ROOT.RooFit.Invisible(), ROOT.RooFit.Binning(roobins), ROOT.RooFit.DataError(ROOT.RooAbsData.SumW2), 
                 ROOT.RooFit.Rescale(rescale))
 
-        model.plotOn(frame, ROOT.RooFit.VisualizeError(fres, 1), ROOT.RooFit.FillColor(ROOT.kRed - 7), ROOT.RooFit.LineColor(ROOT.kRed - 7), ROOT.RooFit.Name(fres.GetName()), 
+        model.plotOn(frame, ROOT.RooFit.VisualizeError(fres, 1, False), ROOT.RooFit.FillColor(ROOT.kRed - 7), ROOT.RooFit.LineColor(ROOT.kRed - 7), ROOT.RooFit.Name(fres.GetName()), 
                        fit_norm)
 
         model.plotOn(frame, ROOT.RooFit.LineColor(ROOT.kRed + 1), ROOT.RooFit.Name(model_name),  fit_norm)
@@ -340,6 +340,8 @@ def dijetfit(options):
             value, error = fitter_QCD.fetch(var)
             graph.SetPoint(0, mass, value)
             graph.SetPointError(0, 0.0, error)
+            bkg_fit_params[var] = value
+            bkg_fit_params[var + "_err"] = error
             #frac_err = abs(error/value)
             #largest_frac_err = max(frac_err, largest_frac_err)
         
