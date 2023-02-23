@@ -213,6 +213,7 @@ def dijetfit(options):
 
     print("\n\n ############# FIT BACKGROUND AND SAVE PARAMETERS ###########")
     #nParsToTry = [2, 3, 4, 5]
+
     nParsToTry = [2, 3, 4]
     chi2s = [0]*len(nParsToTry)
     ndofs = [0]*len(nParsToTry)
@@ -241,7 +242,6 @@ def dijetfit(options):
         fitter_QCD.importBinnedData(fitting_histogram, ['mjj_fine'], data_name)
         
         #Running fit two times seems to improve things (better initial guesses for params?)
-        
         fres = fitter_QCD.fit(model_name, data_name, options=[ROOT.RooFit.Save(1), ROOT.RooFit.Verbose(0),  ROOT.RooFit.Minos(1)])
         fres = fitter_QCD.fit(model_name, data_name, options=[ROOT.RooFit.Save(1), ROOT.RooFit.Verbose(0),  ROOT.RooFit.Minos(1)])
 
@@ -262,11 +262,11 @@ def dijetfit(options):
         dataset = fitter_QCD.getData(data_name)
 
         #rescale so pdfs are in evts per 100 GeV
-        low = roobins.lowBound()
-        high = roobins.highBound()
+        fit_range_low = roobins.lowBound()
+        fit_range_high = roobins.highBound()
         n = roobins.numBoundaries() - 1
         #RootFit default normalization is full range divided by number of bins
-        default_norm = (high - low)/ n
+        default_norm = (fit_range_high - fit_range_low)/ n
         rescale = 100./ default_norm
         fit_norm = ROOT.RooFit.Normalization(rescale,ROOT.RooAbsReal.Relative)
 
@@ -287,7 +287,7 @@ def dijetfit(options):
         hresid = frame.residHist(data_name, model_name, False, useBinAverage)
         dhist = ROOT.RooHist(frame.findObject(data_name, ROOT.RooHist.Class()))
 
-        #print_roohist(dhist)
+
 
         #redraw data (so on top of model curves)
         if(options.rebin):
@@ -298,30 +298,43 @@ def dijetfit(options):
                        ROOT.RooFit.Rescale(rescale))
 
 
-        framePulls = mjj.frame()
-        framePulls.addPlotable(hpull, "X0 P E1")
+
+        useBinAverage = True
+        hpull = frame.pullHist(data_name, model_name, useBinAverage)
+        hresid = frame.residHist(data_name, model_name, False, useBinAverage)
+        dhist = ROOT.RooHist(frame.findObject(data_name, ROOT.RooHist.Class()))
 
 
-        #get fractional error on fit, evaluated at signal mass
-        central = frame.getCurve("model_b%i" % i);
+
+        #get fractional error on fit
+        central = frame.getCurve(model_name);
         curve =  frame.getCurve("fitresults");
         upBound = ROOT.TGraph(central.GetN());
         loBound = ROOT.TGraph(central.GetN());
+        norm = get_roohist_sum(dhist)
 
         for j in range(curve.GetN()):
             if( j < central.GetN() ): upBound.SetPoint(j, curve.GetX()[j], curve.GetY()[j]);
-            else: loBound.SetPoint(j, curve.GetX()[j], curve.GetY()[j]);
+            else: loBound.SetPoint( 2*central.GetN() - j, curve.GetX()[j], curve.GetY()[j]);
+
+
+        fit_hist = model.createHistogram("h_model_fit", mjj, ROOT.RooFit.Binning(roobins))
+        fit_hist.Scale(norm / fit_hist.Integral())
+
+        #Get hist of pulls:  (data - fit) / tot_unc
+        hresid_norm = get_pull_hist(model, frame, central, curve, hresid, fit_hist,  bins)
+        #hresid_norm.Print("range")
+
 
         err_on_sig = (upBound.Eval(options.mass) - loBound.Eval(options.mass))/2.
         frac_err_on_sig = err_on_sig / central.Eval(options.mass)
         bkg_fit_frac_err = frac_err_on_sig
 
 
-
         my_chi2, my_ndof = calculateChi2(hpull, nPars, excludeZeros = True, dataHist = dhist)
         my_prob = ROOT.TMath.Prob(my_chi2, my_ndof)
-        PlotFitResults(frame, fres.GetName(), nPars, framePulls, data_name,
-                       model_name, my_chi2, my_ndof,
+        PlotFitResults(frame, fres.GetName(), nPars, hresid_norm, data_name,
+                       [model_name], my_chi2, my_ndof,
                        str(nPars) + "par_qcd_fit_binned{}".format(
                            "_blinded" if options.blinded else ""),
                        plot_dir, plot_label = label)
@@ -422,7 +435,7 @@ def dijetfit(options):
     print(cmd)
     os.system(cmd)
     sbfit_chi2, sbfit_ndof = checkSBFit('workspace_JJ_{l1}_{l2}.root'.format(l1=label, l2=sb_label),
-               sb_label, roobins, label + "_" + sb_label, nPars_QCD, plot_dir, plot_label = label)
+               sb_label, bins, label + "_" + sb_label, nPars_QCD, plot_dir = plot_dir, draw_sig = options.draw_sig, plot_label = label)
 
     sbfit_prob = ROOT.TMath.Prob(sbfit_chi2, sbfit_ndof)
 
@@ -541,6 +554,8 @@ def fitting_options():
                       help="Where to put the plots")
     parser.add_option("-l", "--label", dest="label", default='test',
                       help="Label for file names")
+    parser.add_option("--no_draw_sig", dest="draw_sig", action = 'store_false', help="Don't draw separate signal and bkg contribution on S+B fit plots")
+    parser.set_defaults(draw_sig = True)
     parser.add_option("-b", "--blinded", dest="blinded", action="store_true",
                       default=False,
                       help="Blinding the signal region for the fit.")

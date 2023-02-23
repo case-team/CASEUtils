@@ -107,8 +107,61 @@ def truncate(binning,mmin,mmax):
             res.append(b)
     return res
 
+#get hist of (data - fit) / tot_unc 
+def get_pull_hist(model, frame, central, curve,  hresid, fit_hist, bins):
 
-def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvname, plot_dir, has_sig = False, plot_label = ""):
+    
+    hresid_norm = ROOT.TH1F(hresid.GetName() + "_norm", "", len(bins) -1, array('d', bins))
+
+    upBound = ROOT.TGraph(central.GetN());
+    loBound = ROOT.TGraph(central.GetN());
+
+    #Compute uncertainty on fit function, done in original fine binning 
+    for j in range(curve.GetN()):
+        if( j < central.GetN() ): upBound.SetPoint(j, curve.GetX()[j], curve.GetY()[j]);
+        else: loBound.SetPoint( 2*central.GetN() - j, curve.GetX()[j], curve.GetY()[j]);
+
+
+    #print_roohist(hresid)
+    #print_roohist(hpull)
+
+    a_x = array('d', [0.])
+    a_val = array('d', [0.])
+    a_data = array('d', [0.])
+
+
+    #compute pulls as (data - fit) / total unc
+    for j in range(1, fit_hist.GetNbinsX()+1):
+        delta = 0.001
+        xcenter = fit_hist.GetXaxis().GetBinCenter(j)
+
+        hresid.GetPoint(j-1, a_x, a_val)
+        data_err = hresid.GetErrorY(j-1)
+        resid = a_val[0]
+
+        fit_val = fit_hist.GetBinContent(j)
+
+        #transfer fractional uncertainty on fit in fine binning to larger binning 
+        #kinda approximate, but couldn't find better solution from roofit :/ 
+        up_err  = fit_val * abs(central.Eval(xcenter) - upBound.Eval(xcenter)) / central.Eval(xcenter)
+        down_err  = fit_val * abs(central.Eval(xcenter) - loBound.Eval(xcenter)) / central.Eval(xcenter)
+
+        #Add data and fit unc together in quadrature
+        if(resid > 0): tot_err = (up_err**2 + data_err**2)**(0.5)
+        else: tot_err = (down_err**2 + data_err**2)**(0.5)
+        pull = resid / tot_err
+        #print(j, xcenter, resid, fit_val, data_err, up_err, down_err, tot_err, pull)
+
+        hresid_norm.SetBinContent(j, pull)
+
+    hresid_norm.SetFillColor(ROOT.kGray)
+    hresid_norm.SetLineColor(ROOT.kGray)
+
+    return hresid_norm
+
+
+
+def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvname, plot_dir, has_sig = False, draw_sig = False, plot_label = "", ratio_unc = None):
 
     c1 =ROOT.TCanvas("c1","",800,800)
     c1.SetLogy()
@@ -147,7 +200,9 @@ def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvn
     legend.SetFillColor(0)
     legend.SetFillStyle(0)
     legend.SetMargin(0.35)
-    legend2.SetTextSize(0.038)
+
+    #2nd legend just for fit unc band
+    legend2.SetTextSize(0.046)
     legend2.SetLineColor(0)
     legend2.SetShadowColor(0)
     legend2.SetLineStyle(1)
@@ -156,17 +211,29 @@ def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvn
     legend2.SetFillStyle(0)
     legend2.SetMargin(0.35)
     legend.AddEntry(frame.findObject(data_name),"Data","lpe")
-    if(not has_sig): 
-        legend.AddEntry(frame.findObject(pdf_names[0]),"%i par. background fit"%nPars,"l")
+    if(len(pdf_names[0]) > 1):
+        fit_name = pdf_names[0]
+    else: fit_name = pdf_names
+    if(not has_sig or not draw_sig): 
+        legend.AddEntry(frame.findObject(fit_name),"%i par. background fit"%nPars,"l")
+        legend.AddEntry("","","")
+        legend.AddEntry("","","")
+
+        legend2.AddEntry("","","")
+        legend2.AddEntry(frame.findObject(fitErrs),"","f")
+        legend2.AddEntry("","","")
+        legend2.AddEntry("","","")
 
     else: 
-        legend.AddEntry(frame.findObject(pdf_names[0]),"Signal + Background Fit ","l")
-    legend2.AddEntry("","","")
-    legend2.AddEntry("","","")
-    legend2.AddEntry("","","")
-    legend2.AddEntry("","","")
-    legend2.AddEntry(frame.findObject(fitErrs),"","f")
-    legend2.AddEntry("","","")
+        legend.AddEntry(frame.findObject(fit_name),"Signal + Background Fit ","l")
+        legend.AddEntry(frame.findObject(pdf_names[1]),"Signal ","l")
+        legend.AddEntry(frame.findObject(pdf_names[2]),"Background ","l")
+
+        legend2.AddEntry("","","")
+        legend2.AddEntry(frame.findObject(fitErrs),"","f")
+        legend2.AddEntry("","","")
+        legend2.AddEntry("","","")
+
 
     legend2.Draw("same")
     legend.Draw("same")
@@ -177,8 +244,9 @@ def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvn
     pt.SetFillColor(0)
     pt.SetBorderSize(0)
     pt.SetFillStyle(0)
-    pt.AddText("Chi2/ndf = %.2f/%i = %.2f"%(chi2,ndof,chi2/ndof))
-    pt.AddText("Prob = %.3f"%ROOT.TMath.Prob(chi2,ndof))
+    if(ndof > 0): 
+        pt.AddText("Chi2/ndf = %.2f/%i = %.2f"%(chi2,ndof,chi2/ndof))
+        pt.AddText("Prob = %.3f"%ROOT.TMath.Prob(chi2,ndof))
     pt.Draw()
 
     pt2 = ROOT.TPaveText(0.5,0.8,0.6,0.9,"NDC")
@@ -200,12 +268,12 @@ def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvn
     p11_2.SetRightMargin(0.05)
     p11_2.SetGridx(0)
     p11_2.SetGridy(0)
-    pulls.SetMinimum(-5)
-    pulls.SetMaximum(5)
+    pulls.SetMinimum(-4.0)
+    pulls.SetMaximum(4.0)
     pulls.SetTitle("")
     pulls.SetXTitle("Dijet invariant mass (GeV)")
     pulls.GetXaxis().SetTitleSize(0.06)
-    pulls.SetYTitle("#frac{Data-Fit}{#sigma_{data}}")
+    pulls.SetYTitle("#frac{Data-Fit}{Unc.}")
     pulls.GetYaxis().SetTitleSize(0.15)
     pulls.GetYaxis().CenterTitle()
     pulls.GetYaxis().SetTitleOffset(0.30)
@@ -215,24 +283,17 @@ def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvn
     pulls.GetXaxis().SetLabelSize(0.12)
     pulls.GetXaxis().SetNdivisions(906)
     pulls.GetYaxis().SetNdivisions(305)
-    pulls.Draw("same")
+    pulls.Draw("same hist")
     line = ROOT.TLine(frame.GetXaxis().GetXmin() , 0 , frame.GetXaxis().GetXmax(),0)
-    line1  = ROOT.TLine(frame.GetXaxis().GetXmin(), 1 ,frame.GetXaxis().GetXmax(),1)
-    line2  = ROOT.TLine(frame.GetXaxis().GetXmin(), -1 ,frame.GetXaxis().GetXmax(),-1)
-    line1.SetLineStyle(2)
-    line1.SetLineWidth(2)
-    line2.SetLineStyle(2)
-    line2.SetLineWidth(2)
     line.Draw("same")
-    line1.Draw("same")
-    line2.Draw("same")   
     c1.Update()
 
     canvname+='.png'
     c1.SaveAs(plot_dir + canvname)
     #c1.SaveAs(canvname.replace("png","C"),"C")
 
-def print_roohist(h):
+def get_roohist_sum(h):
+    d_sum = 0
     a_x = array('d', [0.])
     a_val = array('d', [0.])
     a_data = array('d', [0.])
@@ -241,6 +302,22 @@ def print_roohist(h):
         h.GetPoint(p, a_x, a_val)
         e = h.GetErrorY(p)
         print("%i %.3f %.3f %.3f" % (p, a_x[0], a_val[0], e))
+        d_sum += a_val[0]
+    return d_sum
+
+def print_roohist(h):
+    print(h.GetName())
+    d_sum = 0
+    a_x = array('d', [0.])
+    a_val = array('d', [0.])
+    a_data = array('d', [0.])
+
+    for p in range (0,h.GetN()):
+        h.GetPoint(p, a_x, a_val)
+        e = h.GetErrorY(p)
+        print("%i %.3f %.3f %.3f" % (p, a_x[0], a_val[0], e))
+        d_sum += a_val[0]
+    print("SUM %.1f" % d_sum)
 
 
 
@@ -451,8 +528,6 @@ def get_rebinning(binsx, histos_sb, min_count = 5):
             rebins.pop(below_bins[-1])
 
     #print("new bins:", rebins)
-    #print("Done with rebinning!")
-    #h_rebin.Print("all")
 
     return rebins
 
@@ -461,50 +536,36 @@ def get_rebinning(binsx, histos_sb, min_count = 5):
 
 
     
-def checkSBFit(filename,label,roobins,plotname, nPars, plot_dir, plot_label = ""):
+def checkSBFit(filename,label,bins,plotname, nPars, plot_dir = "", draw_sig = True, plot_label = "" ):
+
+    roobins = ROOT.RooBinning(len(bins)-1, array('d', bins), "SB_bins")
     
     fin = ROOT.TFile.Open(filename,'READ')
     workspace = fin.w
 
+    model_name = 'model_s'
+    data_name = 'data_obs'
     sig_name = 'shapeSig_model_signal_mjj_JJ_%s' % label
-    model_tot = workspace.pdf('model_s')
+    model_tot = workspace.pdf(model_name)
     model_qcd = workspace.pdf('model_b')
     model_sig = workspace.pdf(sig_name)
-    var = workspace.var('mjj')
-    data = workspace.data('data_obs')
-    data.Print("V")
+    workspace.ls()
+    mjj = workspace.var('mjj')
+    data = workspace.data(data_name)
 
-
-
-    #sig_norm_var_total = workspace.function('n_exp_binJJ_%s_proc_model_signal_mjj' % label).getVal()
-    #var.setRange("int_range", 1500., 6500)
-    #set_ = ROOT.RooArgSet(var)
-    #sig_norm_var_denom = model_sig.createIntegral(set_, set_, "int_range").getVal()
-
-    #sig_norm_var_coeff = sig_norm_var_total/ sig_norm_var_denom
-    #print(sig_norm_var_coeff, sig_norm_var_denom )
-    #sig_norm_var_coeff = 1e-4
-
-    #sig_norm_var = ROOT.RooRealVar("sig_norm_var", "Signal Normalization", sig_norm_var_coeff, sig_norm_var_coeff/100., sig_norm_var_coeff*100.)
-    #sig_norm_var.Print("v")
-
-    #sig_norm_pdf = ROOT.RooAddPdf("sig_norm", "Signal", ROOT.RooArgList(model_sig), ROOT.RooArgList(sig_norm_var))
-    #sig_norm_pdf.Print("v")
 
 
     model = model_tot
 
-    model_tot.Print("v")
+    #model_tot.Print("v")
 
     #default roofit normalization is total range divided by number of bins, we want per 100 GeV
-
 
     #rescale so pdfs are in evts per 100 GeV
     low = roobins.lowBound()
     high = roobins.highBound()
     n = roobins.numBoundaries() - 1
 
-    #RootFit default normalization is full range divided by number of bins
     default_norm = (high - low)/ n
 
     rescale = 100./ default_norm
@@ -516,26 +577,49 @@ def checkSBFit(filename,label,roobins,plotname, nPars, plot_dir, plot_label = ""
     fres = model.fitTo(data,ROOT.RooFit.SumW2Error(1),ROOT.RooFit.Minos(0),ROOT.RooFit.Verbose(0),ROOT.RooFit.Save(1),ROOT.RooFit.NumCPU(8)) 
     #fres.Print()
     
-    frame = var.frame()
+    frame = mjj.frame()
+    pdf_name = 'JJ_%s'%label
     
     data.plotOn(frame, ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson), ROOT.RooFit.Binning(roobins),ROOT.RooFit.Name("data_obs"),ROOT.RooFit.Invisible(), 
             ROOT.RooFit.Rescale(rescale))
-    model.getPdf('JJ_%s'%label).plotOn(frame,ROOT.RooFit.VisualizeError(fres,1),ROOT.RooFit.FillColor(ROOT.kRed-7),ROOT.RooFit.LineColor(ROOT.kRed-7),ROOT.RooFit.Name(fres.GetName()),
+    model.getPdf(pdf_name).plotOn(frame,ROOT.RooFit.VisualizeError(fres,1),ROOT.RooFit.FillColor(ROOT.kRed-7),ROOT.RooFit.LineColor(ROOT.kRed-7),ROOT.RooFit.Name(fres.GetName()),
             fit_norm)
-    model.getPdf('JJ_%s'%label).plotOn(frame,ROOT.RooFit.LineColor(ROOT.kRed+1),ROOT.RooFit.Name("model_s"), fit_norm)
+    if(draw_sig):
+        model.getPdf(pdf_name).Print("V")
+        model.getPdf(pdf_name).plotOn(frame,ROOT.RooFit.Components("shapeSig_model_signal_mjj_JJ_raw"), ROOT.RooFit.LineColor(ROOT.kBlue),ROOT.RooFit.Name("Signal"), fit_norm)
+        #model.getPdf('JJ_%s'%label).plotOn(frame,ROOT.RooFit.Components("model_qcd_mjj_JJ_raw"), ROOT.RooFit.LineColor(ROOT.kMagenta + 3),ROOT.RooFit.Name("Bkg"), fit_norm)
+        model.getPdf(pdf_name).plotOn(frame,ROOT.RooFit.Components("shapeBkg_model_qcd_mjj_JJ_raw"), ROOT.RooFit.LineColor(ROOT.kMagenta + 3),ROOT.RooFit.Name("Background"), fit_norm)
 
-    #model_qcd.plotOn(frame,ROOT.RooFit.VisualizeError(fres,1),ROOT.RooFit.FillColor(ROOT.kGreen-7),ROOT.RooFit.LineColor(ROOT.kGreen-7), ROOT.RooFit.Name("Background"))
-    #model_qcd.plotOn(frame,ROOT.RooFit.LineColor(ROOT.kRed+1),ROOT.RooFit.Name("Background"))
-    #sig_norm_pdf.plotOn(frame,ROOT.RooFit.VisualizeError(fres,1),ROOT.RooFit.FillColor(ROOT.kBlue-7),ROOT.RooFit.LineColor(ROOT.kBlue-7), ROOT.RooFit.Name("Signal"))
-    #sig_norm_pdf.plotOn(frame,ROOT.RooFit.LineColor(ROOT.kBlue+1), ROOT.RooFit.Name("Signal"))
+    model.getPdf(pdf_name).plotOn(frame,ROOT.RooFit.LineColor(ROOT.kRed+1),ROOT.RooFit.Name("model_s"), fit_norm)
 
 
     useBinAverage = True
-    hpull = frame.pullHist("data_obs","model_s",useBinAverage)
-    hresid = frame.residHist("data_obs", "model_s", False, useBinAverage)
-    dhist = ROOT.RooHist(frame.findObject('data_obs', ROOT.RooHist.Class()))
+    hpull = frame.pullHist(data_name, model_name, useBinAverage)
+    hresid = frame.residHist(data_name, model_name, False, useBinAverage)
 
-    #print_roohist(dhist)
+    dhist = ROOT.RooHist(frame.findObject(data_name, ROOT.RooHist.Class()))
+
+
+    #get fractional error on fit
+    central = frame.getCurve("model_s");
+    curve =  frame.getCurve("fitresult_model_s_data_obs");
+    upBound = ROOT.TGraph(central.GetN());
+    loBound = ROOT.TGraph(central.GetN());
+    norm = get_roohist_sum(dhist)
+
+    for j in range(curve.GetN()):
+        if( j < central.GetN() ): upBound.SetPoint(j, curve.GetX()[j], curve.GetY()[j]);
+        else: loBound.SetPoint( 2*central.GetN() - j, curve.GetX()[j], curve.GetY()[j]);
+
+
+    fit_hist = model.createHistogram("h_model_fit", mjj, ROOT.RooFit.Binning(roobins))
+    fit_hist.Scale(norm / fit_hist.Integral())
+
+    #Get hist of pulls:  (data - fit) / tot_unc
+    hresid_norm = get_pull_hist(model, frame, central, curve, hresid, fit_hist,  bins)
+    #hresid_norm.Print("range")
+
+
 
 
     chi2, ndof = calculateChi2(hpull, nPars + 1, excludeZeros = True, dataHist = dhist)
@@ -544,15 +628,12 @@ def checkSBFit(filename,label,roobins,plotname, nPars, plot_dir, plot_label = ""
     data.plotOn(frame,ROOT.RooFit.DataError(ROOT.RooAbsData.SumW2), ROOT.RooFit.Binning(roobins),ROOT.RooFit.Name("data_obs"),ROOT.RooFit.XErrorSize(0), 
             ROOT.RooFit.Rescale(rescale))
 
-    frame3 = var.frame()
-    #average bin edges instead of bin center
-    frame3.addPlotable(hpull,"X0 P E1")
     
 
     #chi2,ndof = calculateChi2(hpull, nPars +1)
 
-    pdf_names = ["model_s"] 
-    PlotFitResults(frame,fres.GetName(),nPars+1,frame3,"data_obs", pdf_names,chi2,ndof,'sbFit_'+plotname, plot_dir, has_sig = True, plot_label = plot_label)
+    pdf_names = ["model_s", "Signal", "Background"] 
+    PlotFitResults(frame,fres.GetName(),nPars, hresid_norm,"data_obs", pdf_names,chi2,ndof,'sbFit_'+plotname, plot_dir, has_sig = True, draw_sig = draw_sig, plot_label = plot_label)
 
     print "chi2,ndof are", chi2, ndof
     return chi2, ndof

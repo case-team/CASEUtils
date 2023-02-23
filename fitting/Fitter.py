@@ -197,17 +197,19 @@ class Fitter(object):
 
     def qcdShape(self,name = 'model',poi="MVV",nPars=2):
 
+        if(type(poi) == str): poi = self.w.var(poi)
+
         ROOT.gSystem.Load("libHiggsAnalysisCombinedLimit")
 
         if nPars==2:
             self.w.factory("p1[9.28433e+00, -100. , 100.]")
             self.w.factory("p2[1.03641e+01, -200, 200]")
-            model = ROOT.RooGenericPdf(name, "pow(1-@0/13000., @1)/pow(@0/13000., @2)", ROOT.RooArgList(self.w.var(poi), self.w.var("p1"), self.w.var("p2")))	 
+            model = ROOT.RooGenericPdf(name, "pow(1-@0/13000., @1)/pow(@0/13000., @2)", ROOT.RooArgList(poi, self.w.var("p1"), self.w.var("p2")))	 
         elif nPars==3: 
             self.w.factory("p1[9.28433e+00, -100. , 100.]")
             self.w.factory("p2[1.03641e+01, -200, 200]")
             self.w.factory("p3[2.35256e+00, -100., 100.]")
-            model = ROOT.RooGenericPdf(name, "pow(1-@0/13000., @1)/pow(@0/13000., @2+@3*log(@0/13000.))", ROOT.RooArgList(self.w.var(poi), self.w.var("p1"), self.w.var("p2"), self.w.var("p3")))
+            model = ROOT.RooGenericPdf(name, "pow(1-@0/13000., @1)/pow(@0/13000., @2+@3*log(@0/13000.))", ROOT.RooArgList(poi, self.w.var("p1"), self.w.var("p2"), self.w.var("p3")))
         elif nPars==4:
             #default set
             self.w.factory("p1[9.28433e+00, -100. , 100.]")
@@ -230,7 +232,7 @@ class Fitter(object):
             #self.w.factory("p3[7.46099e+00, 0., 50.]")
             #self.w.factory("p4[1.78503e+00, -1000., 100.]")
 
-            model = ROOT.RooGenericPdf(name, "pow(1-@0/13000., @1)/ ( pow(@0/13000., @2+@3*log(@0/13000.)+@4*pow(log(@0/13000.),2)) )", ROOT.RooArgList(self.w.var(poi), self.w.var("p1"), self.w.var("p2"), self.w.var("p3"), self.w.var("p4")))
+            model = ROOT.RooGenericPdf(name, "pow(1-@0/13000., @1)/ ( pow(@0/13000., @2+@3*log(@0/13000.)+@4*pow(log(@0/13000.),2)) )", ROOT.RooArgList(poi, self.w.var("p1"), self.w.var("p2"), self.w.var("p3"), self.w.var("p4")))
             #alt func
             #model = ROOT.RooGenericPdf(name, "( @1*pow(1-@0/13000 + @4*pow(@0/13000,2),@2) ) / ( pow(@0/13000,@3) )", ROOT.RooArgList(self.w.var(poi), self.w.var("p1"), self.w.var("p2"), self.w.var("p3"), self.w.var("p4")))
 
@@ -241,8 +243,8 @@ class Fitter(object):
             self.w.factory("p4[4.17695e-01, -100., 100.]")
             self.w.factory("p5[1.00000e+01, -100., 100.]")
 
-            model = ROOT.RooGenericPdf(name, "pow(exp(-@0/13000.),@4) *pow(1-@0/13000., @1)/ ( pow(@0/13000., @2+@3*log(@0/13000.)+@4*pow(log(@0/13000.),2)) )", 
-                    ROOT.RooArgList(self.w.var(poi), self.w.var("p1"), self.w.var("p2"), self.w.var("p3"), self.w.var("p4"), self.w.var("p5")))
+            model = ROOT.RooGenericPdf(name, "pow(exp(-@0/13000.),@5) *pow(1-@0/13000., @1)/ ( pow(@0/13000., @2+@3*log(@0/13000.)+@4*pow(log(@0/13000.),2)) )", 
+                    ROOT.RooArgList(poi, self.w.var("p1"), self.w.var("p2"), self.w.var("p3"), self.w.var("p4"), self.w.var("p5")))
 
         elif nPars==6:
 
@@ -252,6 +254,119 @@ class Fitter(object):
             self.w.factory("p4[-8.53977e-02, -100., 100.]")
             self.w.factory("p5[1000, 1., 5000.]")
             self.w.factory("p6[1600, 0., 2500.]")
-            model = ROOT.RooGenericPdf(name, "(0.5*tanh((@0-@6)/@5) + .5)*pow(1-@0/13000., @1) / ( pow(@0/13000., @2+@3*log(@0/13000.)+@4*pow(log(@0/13000.),2)) )", ROOT.RooArgList(self.w.var(poi), self.w.var("p1"), self.w.var("p2"), self.w.var("p3"), self.w.var("p4"), self.w.var("p5"), self.w.var("p6"))) 
+            model = ROOT.RooGenericPdf(name, "(0.5*tanh((@0-@6)/@5) + .5)*pow(1-@0/13000., @1) / ( pow(@0/13000., @2+@3*log(@0/13000.)+@4*pow(log(@0/13000.),2)) )", ROOT.RooArgList(poi, self.w.var("p1"), self.w.var("p2"), self.w.var("p3"), self.w.var("p4"), self.w.var("p5"), self.w.var("p6"))) 
 
         getattr(self.w,'import')(model,ROOT.RooFit.Rename(name))
+        return model
+
+    def altBkgShape(self,name = 'model',poi="MVV",ver= 1):
+
+        if(type(poi) == str): poi = self.w.var(poi)
+
+
+        if( ver == 1):
+            self.w.factory("ap1[7.7, -100. , 100.]")
+            self.w.factory("ap2[10, -200, 200]")	 
+            self.w.factory("ap3[2.3, -100., 100.]")
+            self.w.factory("ap4[0.4, -100., 100.]")
+
+            model = ROOT.RooGenericPdf(name, "exp( -@1 * @0/13000.) / ( pow(@0/13000., @2+@3*log(@0/13000.)+@4*pow(log(@0/13000.),2)) )", 
+                ROOT.RooArgList(poi, self.w.var("ap1"), self.w.var("ap2"), self.w.var("ap3"), self.w.var("ap4")))
+
+        elif( ver == 2):
+            self.w.factory("ap1[9.28433e+00, -100. , 100.]")
+            self.w.factory("ap2[1.03641e+01, -200, 200]")	 
+            self.w.factory("ap3[2.35256e+00, -100., 100.]")
+            self.w.factory("ap4[4.17695e-01, -100., 100.]")
+
+            model = ROOT.RooGenericPdf(name, " pow(@0/13000.,-@1) * exp( -@2 * @0/13000. - @3 * pow( @0/13000., 2) - @4 * pow(@0 / 13000., 3))", 
+                ROOT.RooArgList(poi, self.w.var("ap1"), self.w.var("ap2"), self.w.var("ap3"), self.w.var("ap4")))
+
+        getattr(self.w,'import')(model,ROOT.RooFit.Rename(name))
+        return model
+
+    def addDCBSignalShape(self, name, poi, jsonFile, scale={},
+                          resolution={}):
+
+        
+        pdfName="_".join([name,])
+        
+        scaleStr='0'
+        resolutionStr='0'
+
+        scaleSysts=[]
+        resolutionSysts=[]
+        for syst,factor in scale.iteritems():
+            self.w.factory(syst+"[0,-0.1,0.1]")
+            scaleStr=scaleStr+"+{factor}*{syst}".format(factor=factor,syst=syst)
+            scaleSysts.append(syst)
+        for syst,factor in resolution.iteritems():
+            self.w.factory(syst+"[0,-0.5,0.5]")
+            resolutionStr=resolutionStr+"+{factor}*{syst}".format(factor=factor,syst=syst)
+            resolutionSysts.append(syst)
+            
+        if(type(poi) == str): 
+            poi = self.w.var(poi)
+    
+        f = ROOT.TFile(jsonFile,'READ')
+        meanG = f.Get('mean')
+        sigmaG = f.Get('sigma')
+        alpha_oneG = f.Get('alpha')
+        sign_oneG = f.Get('sign')
+        alpha_twoG = f.Get('alpha2')
+        sign_twoG = f.Get('sign2')
+
+        x = ROOT.Double(0.)
+        mean = ROOT.Double(0.)
+        meanG.GetPoint(0,x,mean)
+        sigma = ROOT.Double(0.)
+        sigmaG.GetPoint(0,x,sigma)
+        alpha_one = ROOT.Double(0.)
+        alpha_oneG.GetPoint(0, x, alpha_one)
+        alpha_two = ROOT.Double(0.)
+        alpha_twoG.GetPoint(0, x, alpha_two)
+        sign_one = ROOT.Double(0.)
+        sign_oneG.GetPoint(0,x,sign_one)
+        sign_two = ROOT.Double(0.)
+        sign_twoG.GetPoint(0,x,sign_two)
+
+        meanVar = "_".join(["MEAN", name, ])
+        self.w.factory(
+            "expr::{name}('{param}*(1+{vv_syst})',{vv_systs},{param})".format(
+                name=meanVar, param=mean, vv_syst=scaleStr,
+                vv_systs=','.join(scaleSysts)))
+
+        sigmaVar = "_".join(["SIGMA", name, ])
+        self.w.factory(
+            "expr::{name}('{param}*(1+{vv_syst})',{vv_systs},{param})".format(
+                name=sigmaVar, param=sigma, vv_syst=resolutionStr,
+                vv_systs=','.join(resolutionSysts)))
+
+        alphaOneVar = "_".join(["ALPHAONE", name, ])        
+        alpha_one = ROOT.RooRealVar(alphaOneVar,alphaOneVar,alpha_one)
+        getattr(self.w, 'import')(alpha_one, ROOT.RooFit.Rename(alphaOneVar))
+
+        alphaTwoVar = "_".join(["ALPHATWO", name, ])        
+        alpha_two = ROOT.RooRealVar(alphaTwoVar, alphaTwoVar, alpha_two)
+        getattr(self.w, 'import')(alpha_two, ROOT.RooFit.Rename(alphaTwoVar))
+        
+        signOneVar = "_".join(["SIGNONE", name, ])
+        sign_one = ROOT.RooRealVar(signOneVar, signOneVar, sign_one)    
+        getattr(self.w, 'import')(sign_one, ROOT.RooFit.Rename(signOneVar))
+        
+        signTwoVar = "_".join(["SIGNTWO", name, ])
+        sign_two = ROOT.RooRealVar(signTwoVar, signTwoVar, sign_two)    
+        getattr(self.w, 'import')(sign_two, ROOT.RooFit.Rename(signTwoVar))
+        
+        #dcbFunc = "_".join(["dcb", name, ])
+        #import pdb; pdb.set_trace()
+        dcb = ROOT.RooDoubleCB(pdfName, pdfName, poi,
+                                      self.w.function(meanVar),
+                                      self.w.function(sigmaVar), alpha_one,
+                                      sign_one, alpha_two, sign_two)
+
+        getattr(self.w, 'import')(dcb, ROOT.RooFit.Rename(pdfName))
+
+        return dcb, [alpha_one, alpha_two, sign_one, sign_two]
+
+
