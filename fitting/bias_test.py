@@ -159,13 +159,16 @@ def bias_test(options):
     rescale = 100./ default_norm
     fit_norm = ROOT.RooFit.Normalization(rescale,ROOT.RooAbsReal.Relative)
 
+    #use toys to sample errors rather than linear method, 
+    #needed b/c dijet fn's usually has strong correlation of params
+    linear_errors = False
 
 
     frame = mjj.frame()
     dataset.plotOn(frame, ROOT.RooFit.Name(data_name), ROOT.RooFit.Invisible(), ROOT.RooFit.Binning(roobins), ROOT.RooFit.DataError(ROOT.RooAbsData.SumW2), 
             ROOT.RooFit.Rescale(rescale))
 
-    model.plotOn(frame, ROOT.RooFit.VisualizeError(fres, 1), ROOT.RooFit.FillColor(ROOT.kRed - 7), ROOT.RooFit.LineColor(ROOT.kRed - 7), ROOT.RooFit.Name(fres.GetName()), 
+    model.plotOn(frame, ROOT.RooFit.VisualizeError(fres, 1, linear_errors), ROOT.RooFit.FillColor(ROOT.kRed - 7), ROOT.RooFit.LineColor(ROOT.kRed - 7), ROOT.RooFit.Name(fres.GetName()), 
                    fit_norm)
 
     model.plotOn(frame, ROOT.RooFit.LineColor(ROOT.kRed + 1), ROOT.RooFit.Name(model_name),  fit_norm)
@@ -310,7 +313,7 @@ def bias_test(options):
     genDataset.plotOn(frame_toy, ROOT.RooFit.Invisible(), ROOT.RooFit.Binning(roobins), ROOT.RooFit.DataError(ROOT.RooAbsData.SumW2), ROOT.RooFit.Name(toy_data_name),
             ROOT.RooFit.Rescale(rescale))
 
-    SB_fit_pdf.plotOn(frame_toy, ROOT.RooFit.VisualizeError(fit_res, 1), ROOT.RooFit.FillColor(ROOT.kRed - 7), ROOT.RooFit.LineColor(ROOT.kRed - 7), ROOT.RooFit.Name(fit_res.GetName()), 
+    SB_fit_pdf.plotOn(frame_toy, ROOT.RooFit.VisualizeError(fit_res, 1, linear_errors), ROOT.RooFit.FillColor(ROOT.kRed - 7), ROOT.RooFit.LineColor(ROOT.kRed - 7), ROOT.RooFit.Name(fit_res.GetName()), 
                    fit_norm)
 
     SB_fit_pdf.plotOn(frame_toy,  ROOT.RooFit.Components(reg_model_name), ROOT.RooFit.LineColor(ROOT.kMagenta + 3),ROOT.RooFit.Name("Background"), fit_norm)

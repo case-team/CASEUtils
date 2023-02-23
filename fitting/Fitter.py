@@ -126,6 +126,9 @@ class Fitter(object):
         self.frame=self.w.var(poi).frame()
 
         f = ROOT.TFile.Open("fitresults.root",'READ')
+
+        linear_errors = False
+
         if f: 
             fr = f.Get('fitresults')
         else:
@@ -135,12 +138,12 @@ class Fitter(object):
         if binning:
             self.w.data(data).plotOn(self.frame,ROOT.RooFit.Binning(binning),ROOT.RooFit.Invisible())
             if fr: 
-                self.w.pdf(model).plotOn(self.frame,ROOT.RooFit.VisualizeError(fr,1),ROOT.RooFit.FillColor(ROOT.kRed-7),ROOT.RooFit.LineColor(ROOT.kRed-7),ROOT.RooFit.Name(fr.GetName()))
+                self.w.pdf(model).plotOn(self.frame,ROOT.RooFit.VisualizeError(fr,1, linear_errors),ROOT.RooFit.FillColor(ROOT.kRed-7),ROOT.RooFit.LineColor(ROOT.kRed-7),ROOT.RooFit.Name(fr.GetName()))
                 self.w.pdf(model).plotOn(self.frame,ROOT.RooFit.LineColor(ROOT.kRed+1))	 
         else: 
             self.w.data(data).plotOn(self.frame,ROOT.RooFit.Invisible())
             if fr: 
-                self.w.pdf(model).plotOn(self.frame,ROOT.RooFit.VisualizeError(fr,1),ROOT.RooFit.FillColor(ROOT.kRed-7),ROOT.RooFit.LineColor(ROOT.kRed-7),ROOT.RooFit.Name(fr.GetName()))
+                self.w.pdf(model).plotOn(self.frame,ROOT.RooFit.VisualizeError(fr,1, linear_errors),ROOT.RooFit.FillColor(ROOT.kRed-7),ROOT.RooFit.LineColor(ROOT.kRed-7),ROOT.RooFit.Name(fr.GetName()))
                 self.w.pdf(model).plotOn(self.frame,ROOT.RooFit.LineColor(ROOT.kRed+1))
 
         if binning: self.w.data(data).plotOn(self.frame,ROOT.RooFit.Binning(binning))

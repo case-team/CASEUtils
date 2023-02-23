@@ -584,9 +584,14 @@ def checkSBFit(filename,label,bins,plotname, nPars, plot_dir = "", draw_sig = Tr
     frame = mjj.frame()
     pdf_name = 'JJ_%s'%label
     
+    #use toys to sample errors rather than linear method, 
+    #needed b/c dijet fn's usually has strong correlation of params
+    linear_errors = False
+
     data.plotOn(frame, ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson), ROOT.RooFit.Binning(roobins),ROOT.RooFit.Name("data_obs"),ROOT.RooFit.Invisible(), 
             ROOT.RooFit.Rescale(rescale))
-    model.getPdf(pdf_name).plotOn(frame,ROOT.RooFit.VisualizeError(fres,1),ROOT.RooFit.FillColor(ROOT.kRed-7),ROOT.RooFit.LineColor(ROOT.kRed-7),ROOT.RooFit.Name(fres.GetName()),
+
+    model.getPdf(pdf_name).plotOn(frame,ROOT.RooFit.VisualizeError(fres,1, linear_errors),ROOT.RooFit.FillColor(ROOT.kRed-7),ROOT.RooFit.LineColor(ROOT.kRed-7),ROOT.RooFit.Name(fres.GetName()),
             fit_norm)
     if(draw_sig):
         model.getPdf(pdf_name).Print("V")

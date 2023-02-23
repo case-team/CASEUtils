@@ -271,13 +271,16 @@ def dijetfit(options):
         rescale = 100./ default_norm
         fit_norm = ROOT.RooFit.Normalization(rescale,ROOT.RooAbsReal.Relative)
 
+        #use toys to sample errors rather than linear method, 
+        #needed b/c dijet fn's usually has strong correlation of params
+        linear_errors = False
 
 
         frame = mjj.frame()
         dataset.plotOn(frame, ROOT.RooFit.Name(data_name), ROOT.RooFit.Invisible(), ROOT.RooFit.Binning(roobins), ROOT.RooFit.DataError(ROOT.RooAbsData.SumW2), 
                 ROOT.RooFit.Rescale(rescale))
 
-        model.plotOn(frame, ROOT.RooFit.VisualizeError(fres, 1), ROOT.RooFit.FillColor(ROOT.kRed - 7), ROOT.RooFit.LineColor(ROOT.kRed - 7), ROOT.RooFit.Name(fres.GetName()), 
+        model.plotOn(frame, ROOT.RooFit.VisualizeError(fres, 1, linear_errors), ROOT.RooFit.FillColor(ROOT.kRed - 7), ROOT.RooFit.LineColor(ROOT.kRed - 7), ROOT.RooFit.Name(fres.GetName()), 
                        fit_norm)
 
         model.plotOn(frame, ROOT.RooFit.LineColor(ROOT.kRed + 1), ROOT.RooFit.Name(model_name),  fit_norm)
@@ -324,7 +327,6 @@ def dijetfit(options):
 
         #Get hist of pulls:  (data - fit) / tot_unc
         hresid_norm = get_pull_hist(model, frame, central, curve, hresid, fit_hist,  bins)
-        #hresid_norm.Print("range")
 
 
         err_on_sig = (upBound.Eval(options.mass) - loBound.Eval(options.mass))/2.
