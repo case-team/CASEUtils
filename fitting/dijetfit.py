@@ -242,9 +242,9 @@ def dijetfit(options):
         fitter_QCD.qcdShape(model_name, 'mjj_fine', nPars)
         fitter_QCD.importBinnedData(fitting_histogram, ['mjj_fine'], data_name)
         
-        #Running fit two times seems to improve things (better initial guesses for params?)
-        fres = fitter_QCD.fit(model_name, data_name, options=[ROOT.RooFit.Save(1), ROOT.RooFit.Verbose(0),  ROOT.RooFit.Minos(1)])
-        fres = fitter_QCD.fit(model_name, data_name, options=[ROOT.RooFit.Save(1), ROOT.RooFit.Verbose(0),  ROOT.RooFit.Minos(1)])
+        fres = fitter_QCD.fit(model_name, data_name, options=[ROOT.RooFit.Save(1), ROOT.RooFit.Verbose(0),  ROOT.RooFit.Minos(1), ROOT.RooFit.Minimizer("Minuit2")])
+        #Running fit two times seems to improve things sometimes (better initial guesses for params?)
+        fres = fitter_QCD.fit(model_name, data_name, options=[ROOT.RooFit.Save(1), ROOT.RooFit.Verbose(0),  ROOT.RooFit.Minos(1), ROOT.RooFit.Minimizer("Minuit2")])
 
         chi2_fine = fitter_QCD.projection(
             model_name, data_name, "mjj_fine",
@@ -329,7 +329,8 @@ def dijetfit(options):
         hresid_norm = get_pull_hist(model, frame, central, curve, hresid, fit_hist,  bins)
 
 
-        err_on_sig = (upBound.Eval(options.mass) - loBound.Eval(options.mass))/2.
+        #abs because somtimes order is reversed
+        err_on_sig = abs(upBound.Eval(options.mass) - loBound.Eval(options.mass))/2.
         frac_err_on_sig = err_on_sig / central.Eval(options.mass)
         bkg_fit_frac_err = frac_err_on_sig
 
@@ -439,9 +440,9 @@ def dijetfit(options):
         + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root "
         + "-m {mass} -n significance_{l1}_{l2} "
         + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root "
-        + "-m {mass} --pvalue -n pvalue_{l1}_{l2}"
+        + "-m {mass} --pvalue -n pvalue_{l1}_{l2} "
         + "&& combine -M AsymptoticLimits workspace_JJ_{l1}_{l2}.root "
-        + "-m {mass} -n lim_{l1}_{l2}"
+        + "-m {mass} -n lim_{l1}_{l2} "
         ).format(mass=mass, l1=label, l2=sb_label)
     print(cmd)
     os.system(cmd)
