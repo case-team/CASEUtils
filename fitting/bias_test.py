@@ -119,7 +119,7 @@ def bias_test(options):
     data_name = "data_qcd"
 
     #Do fit with alt bkg shape
-    if(options.alt_shape_ver == 2):
+    if(options.alt_shape_ver == 2 or options.alt_shape_ver == 1):
         nPars = 4
     elif(options.alt_shape_ver == 3):
         nPars = 3
