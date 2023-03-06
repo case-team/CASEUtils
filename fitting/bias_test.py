@@ -119,7 +119,12 @@ def bias_test(options):
     data_name = "data_qcd"
 
     #Do fit with alt bkg shape
-    nPars = 4
+    if(options.alt_shape_ver == 2):
+        nPars = 4
+    elif(options.alt_shape_ver == 3):
+        nPars = 3
+    elif(options.alt_shape_ver == 4):
+        nPars = 2
     qcd_alt_fname = "altBkg_fit.root"
 
 
@@ -127,7 +132,7 @@ def bias_test(options):
 
     model_name = "model_alt"
     fitter_QCD = Fitter(['mjj_fine'], debug = False)
-    if(options.alt_shape_ver != 1 and options.alt_shape_ver != 2):
+    if(options.alt_shape_ver  <= 0 or options.alt_shape_ver >4):
         print("Unsupported alt_shape_ver %i " % options.alt_shape_ver)
         exit(1)
     alt_bkg_pdf = fitter_QCD.altBkgShape(model_name, 'mjj_fine', options.alt_shape_ver)
