@@ -2,6 +2,7 @@ import ROOT
 from array import array
 import os, sys, re, optparse, pickle, shutil, json, copy
 from Utils import returnString
+from DataCardMaker import *
 import argparse
 from os.path import join
 ROOT.gROOT.SetBatch(True)
@@ -14,11 +15,13 @@ parser.add_argument("--masses", dest="masses", nargs="+", type=float, help="List
 parser.add_argument("-o","--output",dest="output",help="Output directory", default='.')
 parser.add_argument("-m","--min",dest="min",type=float, help="minimum x",default=0)
 parser.add_argument("-M","--max",dest="max",type=float, help="maximum x",default=0)
+parser.add_argument("--plot", default = False, action = 'store_true', help="draw plots of all signals")
 
 
 args = parser.parse_args()
 ### use same settings as in diboson search
 all_graphs = {"graviton" : "mean:spline,sigma:spline,alpha:pol1,sign:pol1,alpha2:pol2,sign2:pol2"}
+all_graphs = {"case" : "mean:spline,sigma:spline,alpha:pol1,sign:pol1,alpha2:pol1,sign2:pol1"}
 
 
 #define output dictionary
@@ -97,7 +100,9 @@ f = open(join(args.output, args.signal_model + "_interpolation.json"), "w")
 json.dump(parameterization, f)
 f.close()
 if args.masses is not None:
-    for mass in args.masses:
+    var = ROOT.RooRealVar("mjj", "mjj", 1450., 6500.)
+    card = DataCardMaker('test')
+    for i,mass in enumerate(args.masses):
         
         graphs = {}
         outfile_name = join(
@@ -117,5 +122,39 @@ if args.masses is not None:
 
         with open(join(args.output, "{}_interpolation_M{}.json".format(args.signal_model, mass)),"w") as f:
             json.dump(mass_templates[mass], f)
+            
+        #individual plots of shapes
+        if(args.plot):
+            card.addDCBSignalShape('sig%i' %i, 'mjj', outfile_name, {'CMS_scale_j': 1.0}, {'CMS_res_j': 1.0})
+            frame = var.frame()
+            c1 =ROOT.TCanvas("c%.0f" % mass,"",800,800)
+            sig1 = card.w.pdf('sig%i_JJ_test' %i)
+
+            sig1.plotOn(frame, ROOT.RooFit.LineColor(ROOT.kRed + 1), ROOT.RooFit.Name("Sig") )
+            frame.SetTitle("")
+            frame.GetYaxis().SetTitle("")
+
+            frame.Draw()
+            frame.GetXaxis().SetRangeUser(0.8 *mass, 1.2*mass)
+            c1.Print(join(args.output, "{}_plot_M{}.png".format(args.signal_model, mass)))
+            del frame, c1
+
+    #master plot with all signals
+    if(args.plot):
+        frame = var.frame()
+        c =ROOT.TCanvas("c_all","",1200,800)
+        frame.SetTitle("")
+        frame.GetYaxis().SetTitle("")
+        colors = [ROOT.kBlue, ROOT.kMagenta + 2, ROOT.kRed + 1, ROOT.kOrange -3, ROOT.kGreen +2, ROOT.kCyan +1]
+        for i,mass in enumerate(args.masses):
+            color = colors[i % len(colors)]
+            sig1 = card.w.pdf('sig%i_JJ_test' %i)
+            sig1.plotOn(frame, ROOT.RooFit.LineColor(color) )
+
+        frame.SetTitle("")
+        frame.GetYaxis().SetTitle("")
+        frame.Draw()
+        c.Print(join(args.output, "{}_plot_allsigs.png".format(args.signal_model)))
+
 
 print("Done!")
