@@ -216,6 +216,7 @@ def dijetfit(options):
 
     nParsToTry = [2, 3, 4]
     chi2s = [0]*len(nParsToTry)
+    fit_params = [0] * len(nParsToTry)
     ndofs = [0]*len(nParsToTry)
     probs = [0]*len(nParsToTry)
     fit_errs = [0]*len(nParsToTry)
@@ -241,9 +242,9 @@ def dijetfit(options):
         fitter_QCD.qcdShape(model_name, 'mjj_fine', nPars)
         fitter_QCD.importBinnedData(fitting_histogram, ['mjj_fine'], data_name)
         
-        #Running fit two times seems to improve things (better initial guesses for params?)
-        fres = fitter_QCD.fit(model_name, data_name, options=[ROOT.RooFit.Save(1), ROOT.RooFit.Verbose(0),  ROOT.RooFit.Minos(1)])
-        fres = fitter_QCD.fit(model_name, data_name, options=[ROOT.RooFit.Save(1), ROOT.RooFit.Verbose(0),  ROOT.RooFit.Minos(1)])
+        fres = fitter_QCD.fit(model_name, data_name, options=[ROOT.RooFit.Save(1), ROOT.RooFit.Verbose(0),  ROOT.RooFit.Minos(1), ROOT.RooFit.Minimizer("Minuit2")])
+        #Running fit two times seems to improve things sometimes (better initial guesses for params?)
+        fres = fitter_QCD.fit(model_name, data_name, options=[ROOT.RooFit.Save(1), ROOT.RooFit.Verbose(0),  ROOT.RooFit.Minos(1), ROOT.RooFit.Minimizer("Minuit2")])
 
         chi2_fine = fitter_QCD.projection(
             model_name, data_name, "mjj_fine",
@@ -270,13 +271,16 @@ def dijetfit(options):
         rescale = 100./ default_norm
         fit_norm = ROOT.RooFit.Normalization(rescale,ROOT.RooAbsReal.Relative)
 
+        #use toys to sample errors rather than linear method, 
+        #needed b/c dijet fn's usually has strong correlation of params
+        linear_errors = False
 
 
         frame = mjj.frame()
         dataset.plotOn(frame, ROOT.RooFit.Name(data_name), ROOT.RooFit.Invisible(), ROOT.RooFit.Binning(roobins), ROOT.RooFit.DataError(ROOT.RooAbsData.SumW2), 
                 ROOT.RooFit.Rescale(rescale))
 
-        model.plotOn(frame, ROOT.RooFit.VisualizeError(fres, 1), ROOT.RooFit.FillColor(ROOT.kRed - 7), ROOT.RooFit.LineColor(ROOT.kRed - 7), ROOT.RooFit.Name(fres.GetName()), 
+        model.plotOn(frame, ROOT.RooFit.VisualizeError(fres, 1, linear_errors), ROOT.RooFit.FillColor(ROOT.kRed - 7), ROOT.RooFit.LineColor(ROOT.kRed - 7), ROOT.RooFit.Name(fres.GetName()), 
                        fit_norm)
 
         model.plotOn(frame, ROOT.RooFit.LineColor(ROOT.kRed + 1), ROOT.RooFit.Name(model_name),  fit_norm)
@@ -323,10 +327,10 @@ def dijetfit(options):
 
         #Get hist of pulls:  (data - fit) / tot_unc
         hresid_norm = get_pull_hist(model, frame, central, curve, hresid, fit_hist,  bins)
-        #hresid_norm.Print("range")
 
 
-        err_on_sig = (upBound.Eval(options.mass) - loBound.Eval(options.mass))/2.
+        #abs because somtimes order is reversed
+        err_on_sig = abs(upBound.Eval(options.mass) - loBound.Eval(options.mass))/2.
         frac_err_on_sig = err_on_sig / central.Eval(options.mass)
         bkg_fit_frac_err = frac_err_on_sig
 
@@ -346,14 +350,21 @@ def dijetfit(options):
 
 
 
+
+
+
         #largest_frac_err = 0.
+        bkg_fit_params = dict()
         for var, graph in graphs.iteritems():
             print(var)
             value, error = fitter_QCD.fetch(var)
+            bkg_fit_params[var] = (value, error)
             graph.SetPoint(0, mass, value)
             graph.SetPointError(0, 0.0, error)
             #frac_err = abs(error/value)
             #largest_frac_err = max(frac_err, largest_frac_err)
+        bkg_fit_params['cov'] = convert_matrix(fres.covarianceMatrix())
+        print(bkg_fit_params['cov'])
 
         qcd_outfile.cd()
         for name, graph in graphs.iteritems():
@@ -371,6 +382,7 @@ def dijetfit(options):
         chi2s[i] = my_chi2
         ndofs[i] = my_ndof
         probs[i] = my_prob
+        fit_params[i] = bkg_fit_params
         fit_errs[i] = bkg_fit_frac_err
         fitter_QCD.delete()
 
@@ -428,9 +440,9 @@ def dijetfit(options):
         + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root "
         + "-m {mass} -n significance_{l1}_{l2} "
         + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root "
-        + "-m {mass} --pvalue -n pvalue_{l1}_{l2}"
+        + "-m {mass} --pvalue -n pvalue_{l1}_{l2} "
         + "&& combine -M AsymptoticLimits workspace_JJ_{l1}_{l2}.root "
-        + "-m {mass} -n lim_{l1}_{l2}"
+        + "-m {mass} -n lim_{l1}_{l2} "
         ).format(mass=mass, l1=label, l2=sb_label)
     print(cmd)
     os.system(cmd)
@@ -497,6 +509,7 @@ def dijetfit(options):
     results['bkgfit_ndof'] = ndofs[best_i]
     results['bkgfit_prob'] = probs[best_i]
     results['bkgfit_frac_err'] = fit_errs[best_i]
+    results['bkg_fit_params'] = fit_params[best_i]
     results['sbfit_chi2'] = sbfit_chi2
     results['sbfit_ndof'] = sbfit_ndof
     results['sbfit_prob'] = sbfit_prob

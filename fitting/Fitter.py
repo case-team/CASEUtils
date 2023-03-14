@@ -126,6 +126,9 @@ class Fitter(object):
         self.frame=self.w.var(poi).frame()
 
         f = ROOT.TFile.Open("fitresults.root",'READ')
+
+        linear_errors = False
+
         if f: 
             fr = f.Get('fitresults')
         else:
@@ -135,12 +138,12 @@ class Fitter(object):
         if binning:
             self.w.data(data).plotOn(self.frame,ROOT.RooFit.Binning(binning),ROOT.RooFit.Invisible())
             if fr: 
-                self.w.pdf(model).plotOn(self.frame,ROOT.RooFit.VisualizeError(fr,1),ROOT.RooFit.FillColor(ROOT.kRed-7),ROOT.RooFit.LineColor(ROOT.kRed-7),ROOT.RooFit.Name(fr.GetName()))
+                self.w.pdf(model).plotOn(self.frame,ROOT.RooFit.VisualizeError(fr,1, linear_errors),ROOT.RooFit.FillColor(ROOT.kRed-7),ROOT.RooFit.LineColor(ROOT.kRed-7),ROOT.RooFit.Name(fr.GetName()))
                 self.w.pdf(model).plotOn(self.frame,ROOT.RooFit.LineColor(ROOT.kRed+1))	 
         else: 
             self.w.data(data).plotOn(self.frame,ROOT.RooFit.Invisible())
             if fr: 
-                self.w.pdf(model).plotOn(self.frame,ROOT.RooFit.VisualizeError(fr,1),ROOT.RooFit.FillColor(ROOT.kRed-7),ROOT.RooFit.LineColor(ROOT.kRed-7),ROOT.RooFit.Name(fr.GetName()))
+                self.w.pdf(model).plotOn(self.frame,ROOT.RooFit.VisualizeError(fr,1, linear_errors),ROOT.RooFit.FillColor(ROOT.kRed-7),ROOT.RooFit.LineColor(ROOT.kRed-7),ROOT.RooFit.Name(fr.GetName()))
                 self.w.pdf(model).plotOn(self.frame,ROOT.RooFit.LineColor(ROOT.kRed+1))
 
         if binning: self.w.data(data).plotOn(self.frame,ROOT.RooFit.Binning(binning))
@@ -281,6 +284,24 @@ class Fitter(object):
 
             model = ROOT.RooGenericPdf(name, " pow(@0/13000.,-@1) * exp( -@2 * @0/13000. - @3 * pow( @0/13000., 2) - @4 * pow(@0 / 13000., 3))", 
                 ROOT.RooArgList(poi, self.w.var("ap1"), self.w.var("ap2"), self.w.var("ap3"), self.w.var("ap4")))
+
+        elif( ver == 3):
+            self.w.factory("ap1[9.28433e+00, -100. , 100.]")
+            self.w.factory("ap2[1.03641e+01, -200, 200]")	 
+            self.w.factory("ap3[2.35256e+00, -100., 100.]")
+            self.w.factory("ap4[4.17695e-01, -100., 100.]")
+
+            model = ROOT.RooGenericPdf(name, " pow(@0/13000.,-@1) * exp( -@2 * @0/13000. - @3 * pow( @0/13000., 2))", 
+                ROOT.RooArgList(poi, self.w.var("ap1"), self.w.var("ap2"), self.w.var("ap3")))
+
+        elif( ver == 4):
+            self.w.factory("ap1[9.28433e+00, -100. , 100.]")
+            self.w.factory("ap2[1.03641e+01, -200, 200]")	 
+            self.w.factory("ap3[2.35256e+00, -100., 100.]")
+            self.w.factory("ap4[4.17695e-01, -100., 100.]")
+
+            model = ROOT.RooGenericPdf(name, " pow(@0/13000.,-@1) * exp( -@2 * @0/13000. )", 
+                ROOT.RooArgList(poi, self.w.var("ap1"), self.w.var("ap2") ))
 
         getattr(self.w,'import')(model,ROOT.RooFit.Rename(name))
         return model

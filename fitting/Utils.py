@@ -84,6 +84,10 @@ def get_palette(mode):
   palette['gv'].append(c)
  
  return palette[mode]
+
+def convert_matrix(mat):
+    mat_arr = mat.GetMatrixArray()
+    return [[mat_arr[i + j*mat.GetNrows()] for j in range(mat.GetNcols())] for i in range(mat.GetNrows())]
  
 def getBinning(binsMVV,minx,maxx,bins):
     l=[]
@@ -487,8 +491,11 @@ def load_h5_sig(h_file, hist, sig_mjj, requireWindow = False, correctStats =Fals
 
 def check_rough_sig(h_file, m_low, m_high):
     with h5py.File(h_file, "r") as f:
-        mjj = f['mjj'][()]
-        is_sig = f['truth_label'][()]
+        if('truth_label' in f.keys()):
+            mjj = f['mjj'][()]
+            is_sig = f['truth_label'][()].reshape(-1)
+        else:
+            return
 
     eps = 1e-6
     in_window = (mjj > m_low) & (mjj < m_high)
@@ -574,20 +581,33 @@ def checkSBFit(filename,label,bins,plotname, nPars, plot_dir = "", draw_sig = Tr
 
 
     
-    fres = model.fitTo(data,ROOT.RooFit.SumW2Error(1),ROOT.RooFit.Minos(0),ROOT.RooFit.Verbose(0),ROOT.RooFit.Save(1),ROOT.RooFit.NumCPU(8)) 
+    fres = model.fitTo(data,ROOT.RooFit.SumW2Error(1),ROOT.RooFit.Minos(0),ROOT.RooFit.Verbose(0),ROOT.RooFit.Save(1),ROOT.RooFit.NumCPU(8), ROOT.RooFit.Minimizer("Minuit2")) 
+    fres = model.fitTo(data,ROOT.RooFit.SumW2Error(1),ROOT.RooFit.Minos(0),ROOT.RooFit.Verbose(0),ROOT.RooFit.Save(1),ROOT.RooFit.NumCPU(8), ROOT.RooFit.Minimizer("Minuit2")) 
     #fres.Print()
     
     frame = mjj.frame()
     pdf_name = 'JJ_%s'%label
     
+    #use toys to sample errors rather than linear method, 
+    #needed b/c dijet fn's usually has strong correlation of params
+    linear_errors = False
+
     data.plotOn(frame, ROOT.RooFit.DataError(ROOT.RooAbsData.Poisson), ROOT.RooFit.Binning(roobins),ROOT.RooFit.Name("data_obs"),ROOT.RooFit.Invisible(), 
             ROOT.RooFit.Rescale(rescale))
-    model.getPdf(pdf_name).plotOn(frame,ROOT.RooFit.VisualizeError(fres,1),ROOT.RooFit.FillColor(ROOT.kRed-7),ROOT.RooFit.LineColor(ROOT.kRed-7),ROOT.RooFit.Name(fres.GetName()),
+
+    model.getPdf(pdf_name).plotOn(frame,ROOT.RooFit.VisualizeError(fres,1, linear_errors),ROOT.RooFit.FillColor(ROOT.kRed-7),ROOT.RooFit.LineColor(ROOT.kRed-7),ROOT.RooFit.Name(fres.GetName()),
             fit_norm)
+
     if(draw_sig):
         model.getPdf(pdf_name).Print("V")
+
+        #unc's on individual components
+        #model.getPdf(pdf_name).plotOn(frame,ROOT.RooFit.Components("shapeSig_model_signal_mjj_JJ_raw"), ROOT.RooFit.VisualizeError(fres, 1, linear_errors), 
+                #ROOT.RooFit.FillColor(ROOT.kCyan), ROOT.RooFit.LineColor(ROOT.kCyan), fit_norm)
+        #model.getPdf(pdf_name).plotOn(frame,ROOT.RooFit.Components("shapeBkg_model_qcd_mjj_JJ_raw"), ROOT.RooFit.VisualizeError(fres, 1, linear_errors), 
+                #ROOT.RooFit.LineColor(ROOT.kMagenta + 3), ROOT.RooFit.FillColor(ROOT.kMagenta), fit_norm)
+
         model.getPdf(pdf_name).plotOn(frame,ROOT.RooFit.Components("shapeSig_model_signal_mjj_JJ_raw"), ROOT.RooFit.LineColor(ROOT.kBlue),ROOT.RooFit.Name("Signal"), fit_norm)
-        #model.getPdf('JJ_%s'%label).plotOn(frame,ROOT.RooFit.Components("model_qcd_mjj_JJ_raw"), ROOT.RooFit.LineColor(ROOT.kMagenta + 3),ROOT.RooFit.Name("Bkg"), fit_norm)
         model.getPdf(pdf_name).plotOn(frame,ROOT.RooFit.Components("shapeBkg_model_qcd_mjj_JJ_raw"), ROOT.RooFit.LineColor(ROOT.kMagenta + 3),ROOT.RooFit.Name("Background"), fit_norm)
 
     model.getPdf(pdf_name).plotOn(frame,ROOT.RooFit.LineColor(ROOT.kRed+1),ROOT.RooFit.Name("model_s"), fit_norm)
