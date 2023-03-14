@@ -417,8 +417,8 @@ def dijetfit(options):
                                           "mjj_sig", constant=constant)
     #sig_norm = card.addFloatingYield('model_signal_mjj', 0, sig_file_name,
     #                                 "mjj_sig", constant=False)
-    card.addSystematic("CMS_scale_j", "param", [0.0, 0.012])
-    card.addSystematic("CMS_res_j", "param", [0.0, 0.08])
+    card.addSystematic("CMS_scale_j", "param", [0.0, options.scale_j_unc])
+    card.addSystematic("CMS_res_j", "param", [0.0, options.res_j_unc])
 
     card.addQCDShapeNoTag('model_qcd_mjj', 'mjj', qcd_fname, nPars_QCD)
     card.addFloatingYield('model_qcd_mjj', 1, sb_fname, "mjj_sb")
@@ -541,6 +541,11 @@ def dijetfit(options):
 
 def fitting_options():
     parser = optparse.OptionParser()
+    parser.add_option("--scale_j_unc", type=float, default=0.01,
+                      help="Uncertainty on signal mean from JES")
+    parser.add_option("--mjj_max", type=float, default=0.035,
+                      help="Uncertainty on signal width from JER")
+
     parser.add_option("--mjj_min", type=float, default=-1.0,
                       help="Minimum mjj for the fit")
     parser.add_option("--mjj_max", type=float, default=-1.0,
