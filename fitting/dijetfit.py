@@ -543,7 +543,7 @@ def fitting_options():
     parser = optparse.OptionParser()
     parser.add_option("--scale_j_unc", type=float, default=0.01,
                       help="Uncertainty on signal mean from JES")
-    parser.add_option("--mjj_max", type=float, default=0.035,
+    parser.add_option("--res_j_unc", type=float, default=0.035,
                       help="Uncertainty on signal width from JER")
 
     parser.add_option("--mjj_min", type=float, default=-1.0,
