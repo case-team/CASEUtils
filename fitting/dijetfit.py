@@ -437,6 +437,8 @@ def dijetfit(options):
     cmd = (
         "text2workspace.py datacard_JJ_{l2}.txt "
         + "-o workspace_JJ_{l1}_{l2}.root "
+        + "&& combine -M FitDiagnostics workspace_JJ_{l1}_{l2}.root "
+        + "-m {mass} -n _{l1}_{l2} "
         + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root "
         + "-m {mass} -n significance_{l1}_{l2} "
         + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root "
@@ -460,6 +462,8 @@ def dijetfit(options):
     f_pval_name = ('higgsCombinepvalue_{l1}_{l2}.'
                    + 'Significance.mH{mass:.0f}.root'
                    ).format(mass=mass, l1=label, l2=sb_label)
+    f_diagnostics_name = ('fitDiagnostics_{l1}_{l2}.root'
+                   ).format(l1=label, l2=sb_label)
 
     f_signif = ROOT.TFile(f_signif_name, "READ")
     res1 = f_signif.Get("limit")
@@ -472,6 +476,7 @@ def dijetfit(options):
     eps = 0.01
     obs_limit = -1
     exp_limit = exp_low = exp_high = exp_two_low = exp_two_high = -1
+
     
     for i in range(6):
         res2.GetEntry(i)
@@ -497,11 +502,23 @@ def dijetfit(options):
     res3.GetEntry(0)
     pval = res3.limit
     print("p-value is %.3f \n" % pval)
-
     check_rough_sig(options.inputFile, options.mass*0.9, options.mass*1.1)
+
+    f_diagnostics = ROOT.TFile(f_diagnostics_name, "READ")
+    f_diagnostics.ls()
+    params = f_diagnostics.Get("tree_fit_sb")
+    params.GetEntry(0)
+    sig_strength = params.r
+    sig_strength_unc = params.rErr
+
+
     f_signif.Close()
     f_limit.Close()
     f_pval.Close()
+    f_diagnostics.Close()
+
+
+
     results = dict()
 
     # QCD fit results
@@ -516,6 +533,8 @@ def dijetfit(options):
     results['nPars_QCD'] = nPars_QCD
     results['signif'] = signif
     results['pval'] = pval
+    results['obs_excess_events'] = sig_strength*sig_norm
+    results['obs_excess_events_unc'] = sig_strength_unc*sig_norm
     results['obs_lim_events'] = obs_limit*sig_norm
     results['exp_lim_events'] = exp_limit*sig_norm
     results['exp_lim_1sig_low'] = exp_low * sig_norm
