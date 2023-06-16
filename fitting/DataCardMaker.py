@@ -208,6 +208,9 @@ class DataCardMaker:
         sign_two = ROOT.Double(0.)
         sign_twoG.GetPoint(0,x,sign_two)
 
+        self.sig_mean = mean
+        self.sig_sigma = sigma
+
         meanVar = "_".join(["MEAN", name, self.tag])
         self.w.factory(
             "expr::{name}('{param}*(1+{vv_syst})',{vv_systs},{param})".format(
@@ -244,6 +247,7 @@ class DataCardMaker:
                                       sign_one, alpha_two, sign_two)
 
         getattr(self.w, 'import')(dcb, ROOT.RooFit.Rename(pdfName))
+        return dcb
 
 
     def addSignalShape(self,name,variable,jsonFile,scale ={},resolution={}):
@@ -324,6 +328,7 @@ class DataCardMaker:
         cb    = ROOT.RooCBShape(cbFunc, cbFunc,self.w.var(variable), self.w.function(meanVar), self.w.function(sigmaVar), alpha, sign)
         model = ROOT.RooAddPdf(pdfName, pdfName, gauss, cb, self.w.var(sigfracVar)) 
         getattr(self.w,'import')(model,ROOT.RooFit.Rename(pdfName))
+        return model
 
     def addQCDShape(self,name,variable,preconstrains,nPars=4):
 

@@ -305,7 +305,7 @@ def get_roohist_sum(h):
     for p in range (0,h.GetN()):
         h.GetPoint(p, a_x, a_val)
         e = h.GetErrorY(p)
-        print("%i %.3f %.3f %.3f" % (p, a_x[0], a_val[0], e))
+        #print("%i %.3f %.3f %.3f" % (p, a_x[0], a_val[0], e))
         d_sum += a_val[0]
     return d_sum
 
@@ -488,6 +488,23 @@ def load_h5_sig(h_file, hist, sig_mjj, requireWindow = False, correctStats =Fals
     else: mask = mjj > 0.
     if(correctStats): event_num = event_num[mask]
     fill_hist(mjj[mask], hist, event_num)
+
+
+def get_sig_in_window(h_file, m_low, m_high):
+    with h5py.File(h_file, "r") as f:
+        if('truth_label' in f.keys()):
+            mjj = f['mjj'][()]
+            is_sig = f['truth_label'][()].reshape(-1)
+        else:
+            return 0
+
+    eps = 1e-6
+    in_window = (mjj > m_low) & (mjj < m_high)
+    sig_events = is_sig > 0.9
+    bkg_events = is_sig < 0.1
+    S = mjj[sig_events & in_window].shape[0]
+    return S
+
 
 def check_rough_sig(h_file, m_low, m_high):
     with h5py.File(h_file, "r") as f:

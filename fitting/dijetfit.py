@@ -10,6 +10,7 @@ import optparse
 
 import tdrstyle
 import ROOT
+from ROOT import *
 ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetOptTitle(0)
 tdrstyle.setTDRStyle()
@@ -183,6 +184,7 @@ def dijetfit(options):
     
     load_h5_sb(options.inputFile, histos_sb)
     print("************ Found %i total events \n" % histos_sb.GetEntries())
+    print(histos_sb.Integral())
 
     
 
@@ -215,6 +217,7 @@ def dijetfit(options):
     #nParsToTry = [2, 3, 4, 5]
 
     nParsToTry = [2, 3, 4]
+    #nParsToTry = [2]
     chi2s = [0]*len(nParsToTry)
     fit_params = [0] * len(nParsToTry)
     ndofs = [0]*len(nParsToTry)
@@ -411,6 +414,21 @@ def dijetfit(options):
     else:
         card.addSignalShape('model_signal_mjj', 'mjj', sig_file_name,
                             {'CMS_scale_j': 1.0}, {'CMS_res_j': 1.0})
+
+
+    #x = card.w.var("mjj")
+    #model_sig = card.w.pdf("model_signal_mjj_JJ_raw")
+    #x.setRange("test", 2900, 3100)
+
+    #num_sig_bins = 20
+    #sig_bins = np.linspace(options.sig_mass * 0.8, options.sig_mass * 1.2, num_sig_bins + 1)
+    #x.setRange("tot", options.sig_mass * 0.8, options.sig_mass * 1.2)
+    #for i in range(num_sig_bins):
+    #    x.setRange("bin%i" % i, sig_bins[i], sig_bins[i+1])
+    #fracInt = model_sig.createIntegral(RooArgSet(x), RooArgSet(x), "test").getValV()
+    #print(fracInt.getValV())
+    #exit(1)
+
     constant = options.sig_norm
 
     sig_norm = card.addFixedYieldFromFile('model_signal_mjj', 0, sig_file_name,
@@ -434,6 +452,11 @@ def dijetfit(options):
     card.makeCard()
     card.delete()
 
+    #signal yeild in +/- 2 sigma
+    sig_shape_low = card.sig_mean - 2. * card.sig_sigma
+    sig_shape_high = card.sig_mean + 2. * card.sig_sigma
+
+
     cmd = (
         "text2workspace.py datacard_JJ_{l2}.txt "
         + "-o workspace_JJ_{l1}_{l2}.root "
@@ -448,12 +471,16 @@ def dijetfit(options):
         ).format(mass=mass, l1=label, l2=sb_label)
     print(cmd)
     os.system(cmd)
-    sbfit_chi2, sbfit_ndof = checkSBFit('workspace_JJ_{l1}_{l2}.root'.format(l1=label, l2=sb_label),
-               sb_label, bins, label + "_" + sb_label, nPars_QCD, plot_dir = plot_dir, draw_sig = options.draw_sig, plot_label = label)
+    workspace_name = 'workspace_JJ_{l1}_{l2}.root'.format(l1=label, l2=sb_label)
+    sbfit_chi2, sbfit_ndof = checkSBFit(workspace_name, sb_label, bins, label + "_" + sb_label, nPars_QCD, 
+            plot_dir = plot_dir, draw_sig = options.draw_sig, plot_label = label)
 
     sbfit_prob = ROOT.TMath.Prob(sbfit_chi2, sbfit_ndof)
 
     f_signif_name = ('higgsCombinesignificance_{l1}_{l2}.'
+                     + 'Significance.mH{mass:.0f}.root'
+                     ).format(mass=mass, l1=label, l2=sb_label)
+    f_exp_signif_name = ('higgsCombine_exp_significance_{l1}_{l2}.'
                      + 'Significance.mH{mass:.0f}.root'
                      ).format(mass=mass, l1=label, l2=sb_label)
     f_limit_name = ('higgsCombinelim_{l1}_{l2}.'
@@ -470,6 +497,35 @@ def dijetfit(options):
     res1.GetEntry(0)
     signif = res1.limit
     print("Significance is %.3f \n" % signif)
+
+    f_diagnostics = ROOT.TFile(f_diagnostics_name, "READ")
+    params = f_diagnostics.Get("tree_fit_sb")
+    params.GetEntry(0)
+    sig_strength = params.r
+    sig_strength_unc = params.rErr
+
+
+    #expected significance
+    print('sig_norm %.3f' % sig_norm)
+
+
+
+
+
+    true_sig_strength = get_sig_in_window(options.inputFile, sig_shape_low, sig_shape_high) /  sig_norm
+    print("True sig strength %.3f" % true_sig_strength)
+
+    cmd = ("combine -M Significance workspace_JJ_{l1}_{l2}.root -t -1 --expectSignal %.3f --toysFreq " % (true_sig_strength)
+        + "-m {mass} -n _exp_significance_{l1}_{l2} ").format(mass = mass, l1 = label, l2 = sb_label)
+    print(cmd)
+    os.system(cmd)
+
+    f_exp_signif = ROOT.TFile(f_exp_signif_name, "READ")
+    res_e = f_exp_signif.Get("limit")
+    res_e.GetEntry(0)
+    exp_signif = res_e.limit
+    print("Asimov significance is %.3f \n" % exp_signif)
+
 
     f_limit = ROOT.TFile(f_limit_name, "READ")
     res2 = f_limit.Get("limit")
@@ -502,14 +558,8 @@ def dijetfit(options):
     res3.GetEntry(0)
     pval = res3.limit
     print("p-value is %.3f \n" % pval)
-    check_rough_sig(options.inputFile, options.mass*0.9, options.mass*1.1)
+    check_rough_sig(options.inputFile, sig_shape_low, sig_shape_high)
 
-    f_diagnostics = ROOT.TFile(f_diagnostics_name, "READ")
-    f_diagnostics.ls()
-    params = f_diagnostics.Get("tree_fit_sb")
-    params.GetEntry(0)
-    sig_strength = params.r
-    sig_strength_unc = params.rErr
 
 
     f_signif.Close()
@@ -532,6 +582,7 @@ def dijetfit(options):
     results['sbfit_prob'] = sbfit_prob
     results['nPars_QCD'] = nPars_QCD
     results['signif'] = signif
+    results['asimov_signif'] = exp_signif
     results['pval'] = pval
     results['obs_excess_events'] = sig_strength*sig_norm
     results['obs_excess_events_unc'] = sig_strength_unc*sig_norm
