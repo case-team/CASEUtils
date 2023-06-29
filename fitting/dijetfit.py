@@ -7,6 +7,7 @@ import pickle
 import json
 import random
 import optparse
+import numpy as np
 
 import tdrstyle
 import ROOT
@@ -505,6 +506,8 @@ def dijetfit(options):
     res_e = f_exp_signif.Get("limit")
     res_e.GetEntry(0)
     exp_signif = res_e.limit
+
+    exp_pval = 0.5-(0.5*(1+ROOT.Math.erf(exp_signif/np.sqrt(2)))-0.5*(1+ROOT.Math.erf(0/np.sqrt(2))))
     print("Asimov significance is %.3f \n" % exp_signif)
 
 
@@ -541,9 +544,7 @@ def dijetfit(options):
     print("p-value is %.3f \n" % pval)
 
     #signal yeild in +/- 2 sigma
-    sig_shape_low = card.sig_mean - 2. * card.sig_sigma
-    sig_shape_high = card.sig_mean + 2. * card.sig_sigma
-    check_rough_sig(options.inputFile, sig_shape_low, sig_shape_high)
+    check_rough_sig(options.inputFile, options.mass*0.9, options.mass*1.1)
 
     f_diagnostics = ROOT.TFile(f_diagnostics_name, "READ")
     f_diagnostics.ls()
@@ -575,6 +576,7 @@ def dijetfit(options):
     results['nPars_QCD'] = nPars_QCD
     results['signif'] = signif
     results['asimov_signif'] = exp_signif
+    results['asimov_pval'] = exp_pval
     results['pval'] = pval
     results['obs_excess_events'] = sig_strength*sig_norm
     results['obs_excess_events_unc'] = sig_strength_unc*sig_norm
