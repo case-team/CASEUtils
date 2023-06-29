@@ -10,7 +10,6 @@ import optparse
 
 import tdrstyle
 import ROOT
-from ROOT import *
 ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetOptTitle(0)
 tdrstyle.setTDRStyle()
@@ -416,19 +415,6 @@ def dijetfit(options):
                             {'CMS_scale_j': 1.0}, {'CMS_res_j': 1.0})
 
 
-    #x = card.w.var("mjj")
-    #model_sig = card.w.pdf("model_signal_mjj_JJ_raw")
-    #x.setRange("test", 2900, 3100)
-
-    #num_sig_bins = 20
-    #sig_bins = np.linspace(options.sig_mass * 0.8, options.sig_mass * 1.2, num_sig_bins + 1)
-    #x.setRange("tot", options.sig_mass * 0.8, options.sig_mass * 1.2)
-    #for i in range(num_sig_bins):
-    #    x.setRange("bin%i" % i, sig_bins[i], sig_bins[i+1])
-    #fracInt = model_sig.createIntegral(RooArgSet(x), RooArgSet(x), "test").getValV()
-    #print(fracInt.getValV())
-    #exit(1)
-
     constant = options.sig_norm
 
     sig_norm = card.addFixedYieldFromFile('model_signal_mjj', 0, sig_file_name,
@@ -452,9 +438,6 @@ def dijetfit(options):
     card.makeCard()
     card.delete()
 
-    #signal yeild in +/- 2 sigma
-    sig_shape_low = card.sig_mean - 2. * card.sig_sigma
-    sig_shape_high = card.sig_mean + 2. * card.sig_sigma
 
 
     cmd = (
@@ -556,6 +539,10 @@ def dijetfit(options):
     res3.GetEntry(0)
     pval = res3.limit
     print("p-value is %.3f \n" % pval)
+
+    #signal yeild in +/- 2 sigma
+    sig_shape_low = card.sig_mean - 2. * card.sig_sigma
+    sig_shape_high = card.sig_mean + 2. * card.sig_sigma
     check_rough_sig(options.inputFile, sig_shape_low, sig_shape_high)
 
     f_diagnostics = ROOT.TFile(f_diagnostics_name, "READ")

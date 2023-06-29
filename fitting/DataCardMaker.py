@@ -208,9 +208,6 @@ class DataCardMaker:
         sign_two = ROOT.Double(0.)
         sign_twoG.GetPoint(0,x,sign_two)
 
-        self.sig_mean = mean
-        self.sig_sigma = sigma
-
         meanVar = "_".join(["MEAN", name, self.tag])
         self.w.factory(
             "expr::{name}('{param}*(1+{vv_syst})',{vv_systs},{param})".format(
