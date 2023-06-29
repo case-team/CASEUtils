@@ -460,11 +460,11 @@ def dijetfit(options):
     cmd = (
         "text2workspace.py datacard_JJ_{l2}.txt "
         + "-o workspace_JJ_{l1}_{l2}.root "
-        + "&& combine -M FitDiagnostics workspace_JJ_{l1}_{l2}.root "
-        + "-m {mass} -n _{l1}_{l2} "
-        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root "
+        + "&& combine -M FitDiagnostics workspace_JJ_{l1}_{l2}.root --cminPreFit 1 "
+        + "-m {mass} -n _{l1}_{l2} --robustFit 1"
+        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root --usePLC "
         + "-m {mass} -n significance_{l1}_{l2} "
-        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root "
+        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root --usePLC "
         + "-m {mass} --pvalue -n pvalue_{l1}_{l2} "
         + "&& combine -M AsymptoticLimits workspace_JJ_{l1}_{l2}.root "
         + "-m {mass} -n lim_{l1}_{l2} "
@@ -510,9 +510,7 @@ def dijetfit(options):
 
 
 
-
-
-    true_sig_strength = get_sig_in_window(options.inputFile, sig_shape_low, sig_shape_high) /  sig_norm
+    true_sig_strength = get_sig_in_window(options.inputFile, binsx[0], binsx[-1]) /  sig_norm
     print("True sig strength %.3f" % true_sig_strength)
 
     cmd = ("combine -M Significance workspace_JJ_{l1}_{l2}.root -t -1 --expectSignal %.3f --toysFreq " % (true_sig_strength)
@@ -560,6 +558,13 @@ def dijetfit(options):
     print("p-value is %.3f \n" % pval)
     check_rough_sig(options.inputFile, sig_shape_low, sig_shape_high)
 
+    f_diagnostics = ROOT.TFile(f_diagnostics_name, "READ")
+    f_diagnostics.ls()
+    params = f_diagnostics.Get("tree_fit_sb")
+    params.GetEntry(0)
+    sig_strength = params.r
+    sig_strength_unc = params.rErr
+    print('r ', sig_strength, 'unc', sig_strength_unc)
 
 
     f_signif.Close()
