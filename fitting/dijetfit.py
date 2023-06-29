@@ -437,11 +437,11 @@ def dijetfit(options):
     cmd = (
         "text2workspace.py datacard_JJ_{l2}.txt "
         + "-o workspace_JJ_{l1}_{l2}.root "
-        + "&& combine -M FitDiagnostics workspace_JJ_{l1}_{l2}.root "
-        + "-m {mass} -n _{l1}_{l2} "
-        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root "
+        + "&& combine -M FitDiagnostics workspace_JJ_{l1}_{l2}.root --cminPreFit 1 "
+        + "-m {mass} -n _{l1}_{l2} --robustFit 1"
+        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root --usePLC "
         + "-m {mass} -n significance_{l1}_{l2} "
-        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root "
+        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root --usePLC "
         + "-m {mass} --pvalue -n pvalue_{l1}_{l2} "
         + "&& combine -M AsymptoticLimits workspace_JJ_{l1}_{l2}.root "
         + "-m {mass} -n lim_{l1}_{l2} "
@@ -510,6 +510,7 @@ def dijetfit(options):
     params.GetEntry(0)
     sig_strength = params.r
     sig_strength_unc = params.rErr
+    print('r ', sig_strength, 'unc', sig_strength_unc)
 
 
     f_signif.Close()
