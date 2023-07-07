@@ -141,15 +141,14 @@ class DataCardMaker:
         if kind != 'rateParam': self.systematics.append({'name':name,'kind':kind,'values':values })
         else: self.systematics.append({'name':name,'kind':kind,'bin':bin,'process':process,'values':values,'variables':variables})
     
-    def addFixedYieldFromFile(self,name,ID,filename,histoName,constant=1.0):
+    def addFixedYieldFromFile(self,name,ID,filename,histoName,norm = 1680.0):
         pdfName="_".join([name,self.tag])
         f=ROOT.TFile(filename)
         #histogram=f.Get(histoName)
         #events=histogram.Integral()*self.luminosity*constant
-        events=1680.0
 
-        self.contributions.append({'name':name,'pdf':pdfName,'ID':ID,'yield':events})
-        return events
+        self.contributions.append({'name':name,'pdf':pdfName,'ID':ID,'yield':norm})
+        return norm
 
     def addFloatingYield(self,name,ID,filename,histoName,mini=0,maxi=1e+9,constant=False):
         pdfName="_".join([name,self.tag])

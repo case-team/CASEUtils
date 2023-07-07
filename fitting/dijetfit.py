@@ -416,10 +416,9 @@ def dijetfit(options):
                             {'CMS_scale_j': 1.0}, {'CMS_res_j': 1.0})
 
 
-    constant = options.sig_norm
 
     sig_norm = card.addFixedYieldFromFile('model_signal_mjj', 0, sig_file_name,
-                                          "mjj_sig", constant=constant)
+                                          "mjj_sig", norm = options.sig_norm)
     #sig_norm = card.addFloatingYield('model_signal_mjj', 0, sig_file_name,
     #                                 "mjj_sig", constant=False)
     card.addSystematic("CMS_scale_j", "param", [0.0, options.scale_j_unc])
@@ -614,7 +613,7 @@ def fitting_options():
                       help="Minimum mjj for the fit")
     parser.add_option("--mjj_max", type=float, default=-1.0,
                       help="Maximum mjj for the fit")
-    parser.add_option("--sig_norm", type=float, default=1.0,
+    parser.add_option("--sig_norm", type=float, default=1680.0,
                       help="Scale signal pdf normalization by this amount")
     parser.add_option("--ftest_thresh", type=float, default=0.05,
                       help="Threshold to prefer a function in the f-test")
