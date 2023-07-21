@@ -7,6 +7,7 @@ import pickle
 import json
 import random
 import optparse
+import numpy as np
 
 import tdrstyle
 import ROOT
@@ -183,6 +184,7 @@ def dijetfit(options):
     
     load_h5_sb(options.inputFile, histos_sb)
     print("************ Found %i total events \n" % histos_sb.GetEntries())
+    print(histos_sb.Integral())
 
     
 
@@ -215,6 +217,7 @@ def dijetfit(options):
     #nParsToTry = [2, 3, 4, 5]
 
     nParsToTry = [2, 3, 4]
+    #nParsToTry = [2]
     chi2s = [0]*len(nParsToTry)
     fit_params = [0] * len(nParsToTry)
     ndofs = [0]*len(nParsToTry)
@@ -411,10 +414,11 @@ def dijetfit(options):
     else:
         card.addSignalShape('model_signal_mjj', 'mjj', sig_file_name,
                             {'CMS_scale_j': 1.0}, {'CMS_res_j': 1.0})
-    constant = options.sig_norm
+
+
 
     sig_norm = card.addFixedYieldFromFile('model_signal_mjj', 0, sig_file_name,
-                                          "mjj_sig", constant=constant)
+                                          "mjj_sig", norm = options.sig_norm)
     #sig_norm = card.addFloatingYield('model_signal_mjj', 0, sig_file_name,
     #                                 "mjj_sig", constant=False)
     card.addSystematic("CMS_scale_j", "param", [0.0, options.scale_j_unc])
@@ -434,26 +438,32 @@ def dijetfit(options):
     card.makeCard()
     card.delete()
 
+
+
     cmd = (
         "text2workspace.py datacard_JJ_{l2}.txt "
         + "-o workspace_JJ_{l1}_{l2}.root "
-        + "&& combine -M FitDiagnostics workspace_JJ_{l1}_{l2}.root "
-        + "-m {mass} -n _{l1}_{l2} "
-        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root "
+        + "&& combine -M FitDiagnostics workspace_JJ_{l1}_{l2}.root --cminPreFit 1 "
+        + "-m {mass} -n _{l1}_{l2} --robustFit 1"
+        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root --usePLC "
         + "-m {mass} -n significance_{l1}_{l2} "
-        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root "
+        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root --usePLC "
         + "-m {mass} --pvalue -n pvalue_{l1}_{l2} "
         + "&& combine -M AsymptoticLimits workspace_JJ_{l1}_{l2}.root "
         + "-m {mass} -n lim_{l1}_{l2} "
         ).format(mass=mass, l1=label, l2=sb_label)
     print(cmd)
     os.system(cmd)
-    sbfit_chi2, sbfit_ndof = checkSBFit('workspace_JJ_{l1}_{l2}.root'.format(l1=label, l2=sb_label),
-               sb_label, bins, label + "_" + sb_label, nPars_QCD, plot_dir = plot_dir, draw_sig = options.draw_sig, plot_label = label)
+    workspace_name = 'workspace_JJ_{l1}_{l2}.root'.format(l1=label, l2=sb_label)
+    sbfit_chi2, sbfit_ndof = checkSBFit(workspace_name, sb_label, bins, label + "_" + sb_label, nPars_QCD, 
+            plot_dir = plot_dir, draw_sig = options.draw_sig, plot_label = label)
 
     sbfit_prob = ROOT.TMath.Prob(sbfit_chi2, sbfit_ndof)
 
     f_signif_name = ('higgsCombinesignificance_{l1}_{l2}.'
+                     + 'Significance.mH{mass:.0f}.root'
+                     ).format(mass=mass, l1=label, l2=sb_label)
+    f_exp_signif_name = ('higgsCombine_exp_significance_{l1}_{l2}.'
                      + 'Significance.mH{mass:.0f}.root'
                      ).format(mass=mass, l1=label, l2=sb_label)
     f_limit_name = ('higgsCombinelim_{l1}_{l2}.'
@@ -470,6 +480,35 @@ def dijetfit(options):
     res1.GetEntry(0)
     signif = res1.limit
     print("Significance is %.3f \n" % signif)
+
+    f_diagnostics = ROOT.TFile(f_diagnostics_name, "READ")
+    params = f_diagnostics.Get("tree_fit_sb")
+    params.GetEntry(0)
+    sig_strength = params.r
+    sig_strength_unc = params.rErr
+
+
+    #expected significance
+    print('sig_norm %.3f' % sig_norm)
+
+
+
+    true_sig_strength = get_sig_in_window(options.inputFile, binsx[0], binsx[-1]) /  sig_norm
+    print("True sig strength %.3f" % true_sig_strength)
+
+    cmd = ("combine -M Significance workspace_JJ_{l1}_{l2}.root -t -1 --expectSignal %.3f --toysFreq " % (true_sig_strength)
+        + "-m {mass} -n _exp_significance_{l1}_{l2} ").format(mass = mass, l1 = label, l2 = sb_label)
+    print(cmd)
+    os.system(cmd)
+
+    f_exp_signif = ROOT.TFile(f_exp_signif_name, "READ")
+    res_e = f_exp_signif.Get("limit")
+    res_e.GetEntry(0)
+    exp_signif = res_e.limit
+
+    exp_pval = 0.5-(0.5*(1+ROOT.Math.erf(exp_signif/np.sqrt(2)))-0.5*(1+ROOT.Math.erf(0/np.sqrt(2))))
+    print("Asimov significance is %.3f \n" % exp_signif)
+
 
     f_limit = ROOT.TFile(f_limit_name, "READ")
     res2 = f_limit.Get("limit")
@@ -502,6 +541,8 @@ def dijetfit(options):
     res3.GetEntry(0)
     pval = res3.limit
     print("p-value is %.3f \n" % pval)
+
+    #signal yeild in +/- 2 sigma
     check_rough_sig(options.inputFile, options.mass*0.9, options.mass*1.1)
 
     f_diagnostics = ROOT.TFile(f_diagnostics_name, "READ")
@@ -510,6 +551,7 @@ def dijetfit(options):
     params.GetEntry(0)
     sig_strength = params.r
     sig_strength_unc = params.rErr
+    print('r ', sig_strength, 'unc', sig_strength_unc)
 
 
     f_signif.Close()
@@ -532,6 +574,8 @@ def dijetfit(options):
     results['sbfit_prob'] = sbfit_prob
     results['nPars_QCD'] = nPars_QCD
     results['signif'] = signif
+    results['asimov_signif'] = exp_signif
+    results['asimov_pval'] = exp_pval
     results['pval'] = pval
     results['obs_excess_events'] = sig_strength*sig_norm
     results['obs_excess_events_unc'] = sig_strength_unc*sig_norm
@@ -569,7 +613,7 @@ def fitting_options():
                       help="Minimum mjj for the fit")
     parser.add_option("--mjj_max", type=float, default=-1.0,
                       help="Maximum mjj for the fit")
-    parser.add_option("--sig_norm", type=float, default=1.0,
+    parser.add_option("--sig_norm", type=float, default=1680.0,
                       help="Scale signal pdf normalization by this amount")
     parser.add_option("--ftest_thresh", type=float, default=0.05,
                       help="Threshold to prefer a function in the f-test")
