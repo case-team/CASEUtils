@@ -4,6 +4,7 @@ import h5py
 import os
 import sys
 import copy
+import numpy as np
 from os import listdir
 from os.path import isfile, join
 
@@ -31,11 +32,16 @@ def merge(fin_name, fout_name):
             n_fin = float(fin[fin_keys[0]].shape[0])
             n_fout = float(fout[fin_keys[0]].shape[0])
             #efficiency is weighted average of two files
-            fout[key][0] = (n_fin * fin[key][0] + n_fout * fout[key][0]) / (n_fin + n_fout)
+            fout[key][:] = (n_fin * fin[key][:] + n_fout * fout[key][:]) / (n_fin + n_fout)
 
 
     for key in fin_keys:
         utils.append_h5(fout, key, fin[key])
+
+
+    fin.close()
+    fout.close()
+
         
 
 
@@ -48,8 +54,11 @@ def my_copy(fin_name, fout_name):
     for key in fin_keys:
         shape = list(fin[key].shape)
         shape[0] = None
-        fout.create_dataset(key, data = fin[key], chunks = True, maxshape = shape, compression = fin[key].compression)
+        dtype = 'float64' if 'eff' in key else 'float32'
+        fout.create_dataset(key, data = np.array(fin[key]), chunks = True, maxshape = shape, compression = fin[key].compression, dtype = dtype)
 
+    fin.close()
+    fout.close()
 
 
 def merge_multiple(fout_name, fs):
