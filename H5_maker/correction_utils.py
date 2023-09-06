@@ -72,6 +72,8 @@ pog_jsons = {
     "muon": ["MUO", "muon_Z.json.gz"],
     "electron": ["EGM", "electron.json.gz"],
     "pileup": ["LUM", "puWeights.json.gz"],
+    "jet": ["JME", "jmar.json.gz"],
+    "btag": ["BTV", "btagging.json.gz"],
 }
 
 def ang_dist(phi1, phi2):
@@ -111,6 +113,39 @@ def get_pog_json(obj, year):
     #     fname = str(filename)
     # print(fname)
     # return fname
+
+
+def get_puID_SF(jet, year):
+    if(jet.pt > 50): return 1.0,1.0,1.0
+
+    cset = correctionlib.CorrectionSet.from_file(get_pog_json("jet", year))
+    map_name = "PUJetID_eff"
+    wp = "L"
+    nominal = cset[map_name].evaluate(abs(jet.eta), jet.pt, "nom", wp)
+    up = cset[map_name].evaluate(abs(jet.eta), jet.pt, "up", wp)
+    down = cset[map_name].evaluate(abs(jet.eta), jet.pt, "down", wp)
+
+    return nominal,up,down
+
+
+
+def get_bjet_SF(jet, year, cset = None, sample = "deepJet_comb", wp = "M"):
+
+    ul_year = get_UL_year(year)
+    if(cset is None): cset = correctionlib.CorrectionSet.from_file(get_pog_json("btag", year))
+    if(jet.hadronFlavour >= 4): #charm and b
+        flavor = int(jet.hadronFlavour)
+        key = sample
+    else: 
+        flavor = 0
+        key = sample.replace("comb", "incl")
+
+
+
+    nominal = cset[key].evaluate("central", "M", jet.hadronFlavour, abs(jet.eta), jet.pt)
+    up = cset[key].evaluate("up", "M", jet.hadronFlavour, abs(jet.eta), jet.pt)
+    down = cset[key].evaluate("down", "M", jet.hadronFlavour, abs(jet.eta), jet.pt)
+    return nominal, up, down
 
 
 
@@ -190,6 +225,7 @@ def get_pileup_weight(year, nPU):
     e.g. see here: https://cms-nanoaod-integration.web.cern.ch/commonJSONSFs/LUMI_puWeights_Run2_UL/
     """
     cset = correctionlib.CorrectionSet.from_file(get_pog_json("pileup", year))
+    if('APV' in year ): year = '2016'
 
     year_to_corr = {'2016': 'Collisions16_UltraLegacy_goldenJSON',
                     '2017': 'Collisions17_UltraLegacy_goldenJSON',
@@ -204,6 +240,7 @@ def get_pileup_weight(year, nPU):
 
     # add weights (for now only the nominal weight)
     return nom, up, down
+
 
 
 def isFinal(statusFlag):

@@ -2,6 +2,7 @@
 from H5_maker import *
 from array import array
 from correction_utils import *
+import copy
 
 
 
@@ -36,18 +37,20 @@ class Outputer_TTbar(Outputer):
         self.top_weights = []
         self.sort_pfcands = sort_pfcands
         self.year = year
+        self.bjet_corr = correctionlib.CorrectionSet.from_file(get_pog_json("btag", self.year))
+
         self.reset()
 
     def reset(self):
         self.idx = 0
-        self.jet1_PFCands = np.zeros((self.batch_size, self.n_pf_cands,4), dtype=np.float16)
-        self.jet1_extraInfo = np.zeros((self.batch_size, 9), dtype=np.float32)
+        self.jet1_PFCands = np.zeros((self.batch_size, self.n_pf_cands,6), dtype=np.float16)
+        self.jet1_extraInfo = np.zeros((self.batch_size, 10), dtype=np.float32)
         self.jet_kinematics = np.zeros((self.batch_size, 4), dtype=np.float32)
         self.btag_jet_info = np.zeros((self.batch_size, 5), dtype=np.float32)
         self.mu_info = np.zeros((self.batch_size, 4), dtype=np.float32)
         self.event_info = np.zeros((self.batch_size, 6), dtype=np.float32)
-        self.sys_weights = np.zeros((self.batch_size, 27), dtype=np.float32)
-        self.jet1_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
+        self.sys_weights = np.zeros((self.batch_size, 29), dtype=np.float32)
+        self.jet1_JME_vars = np.zeros((self.batch_size, 13), dtype=np.float32)
         self.gen_parts = np.zeros((self.batch_size, 28), dtype=np.float32)
 
 
@@ -77,7 +80,9 @@ class Outputer_TTbar(Outputer):
         #        cand.phi = FullPFCands[cand.pFCandsIdx].phi
         #        cand.mass = FullPFCands[cand.pFCandsIdx].mass
 
-        event_info = [eventNum, MET, MET_phi, genWeight, run, self.year]
+        year_val = 2016.5 if 'APV' in self.year else int(self.year)
+
+        event_info = [eventNum, MET, MET_phi, genWeight, run, year_val]
 
         jet1.pt_corr = jet1.pt
         jet1.msoftdrop_corr = jet1.msoftdrop
@@ -91,35 +96,42 @@ class Outputer_TTbar(Outputer):
 
             #JME corrections
             jet1.pt_corr = inTree.readBranch("FatJet_pt_nom")[jet1.idx]
-            jet1.msoftdrop_corr = inTree.readBranch("FatJet_msoftdrop_nom")[jet1.idx]
+
+            #turn off JMS by default (no UL rec yet)
+            jet1.msoftdrop_corr = inTree.readBranch("FatJet_msoftdrop_raw")[jet1.idx] * inTree.readBranch("FatJet_msoftdrop_corr_JMR")[jet1.idx]
+
+            softdrop_nom = inTree.readBranch("FatJet_msoftdrop_raw")[jet1.idx]
 
 
             #JME systematics
+            jet1_JEC_val = inTree.readBranch("FatJet_corr_JEC")[jet1.idx]
+
+
             jet1_pt_JES_up = inTree.readBranch("FatJet_pt_jesTotalUp")[jet1.idx]
-            jet1_msoftdrop_JES_up = inTree.readBranch("FatJet_msoftdrop_jesTotalUp")[jet1.idx]
+            jet1_msoftdrop_JES_up = jet1.msoftdrop_corr * (jet1_pt_JES_up / jet1.pt_corr)
 
             jet1_pt_JES_down = inTree.readBranch("FatJet_pt_jesTotalDown")[jet1.idx]
-            jet1_msoftdrop_JES_down = inTree.readBranch("FatJet_msoftdrop_jesTotalDown")[jet1.idx]
-
+            jet1_msoftdrop_JES_down = jet1.msoftdrop_corr * (jet1_pt_JES_down / jet1.pt_corr)
 
             jet1_pt_JER_up = inTree.readBranch("FatJet_pt_jerUp")[jet1.idx]
-            jet1_msoftdrop_JER_up = inTree.readBranch("FatJet_msoftdrop_jerUp")[jet1.idx]
+            jet1_msoftdrop_JER_up = jet1.msoftdrop_corr * (jet1_pt_JER_up / jet1.pt_corr)
 
             jet1_pt_JER_down = inTree.readBranch("FatJet_pt_jerDown")[jet1.idx]
-            jet1_msoftdrop_JER_down = inTree.readBranch("FatJet_msoftdrop_jerDown")[jet1.idx]
+            jet1_msoftdrop_JER_down = jet1.msoftdrop_corr * (jet1_pt_JER_up / jet1.pt_corr)
 
-
-            jet1_msoftdrop_JMS_up = inTree.readBranch("FatJet_msoftdrop_jmsUp")[jet1.idx]
-            jet1_msoftdrop_JMS_down = inTree.readBranch("FatJet_msoftdrop_jmsDown")[jet1.idx]
-
-            jet1_msoftdrop_JMR_up = inTree.readBranch("FatJet_msoftdrop_jmrUp")[jet1.idx]
-            jet1_msoftdrop_JMR_down = inTree.readBranch("FatJet_msoftdrop_jmrDown")[jet1.idx]
+            jet1_msoftdrop_JMS_up = jet1.msoftdrop_corr
+            jet1_msoftdrop_JMS_down = jet1.msoftdrop_corr
+            
+            eps = 1e-6
+            jet1_msoftdrop_JMR_up = jet1.msoftdrop_corr * (softdrop_nom / (inTree.readBranch("FatJet_msoftdrop_jmrUp")[jet1.idx] + eps))
+            jet1_msoftdrop_JMR_down = jet1.msoftdrop_corr * (softdrop_nom / (inTree.readBranch("FatJet_msoftdrop_jmrDown")[jet1.idx] + eps))
 
 
 
             jet1.JME_vars = [jet1_pt_JES_up, jet1_msoftdrop_JES_up, jet1_pt_JES_down, jet1_msoftdrop_JES_down, 
                            jet1_pt_JER_up, jet1_msoftdrop_JER_up, jet1_pt_JER_down, jet1_msoftdrop_JER_down,
-                           jet1_msoftdrop_JMS_up, jet1_msoftdrop_JMS_down, jet1_msoftdrop_JMR_up, jet1_msoftdrop_JMR_down]
+                           jet1_msoftdrop_JMS_up, jet1_msoftdrop_JMS_down, jet1_msoftdrop_JMR_up, jet1_msoftdrop_JMR_down, 
+                           jet1_JEC_val]
 
 
 
@@ -180,10 +192,12 @@ class Outputer_TTbar(Outputer):
             #Pileup
             pileup_nom, pileup_up, pileup_down = get_pileup_weight(self.year, inTree.readBranch("Pileup_nTrueInt"))
 
-            btag_nom = btag_up = btag_down = 1.0
-            btag_nom = inTree.readBranch("Jet_btagSF_deepcsv_M") [jet1.idx]
-            btag_up = inTree.readBranch("Jet_btagSF_deepcsv_M_up")[jet1.idx] / btag_nom
-            btag_down = inTree.readBranch("Jet_btagSF_deepcsv_M_down")[jet1.idx] / btag_nom
+            #btag
+            btag_nom, btag_up, btag_down = get_bjet_SF(btag_jet, self.year, cset = self.bjet_corr)
+
+            #PU ID
+            puID_nom, puID_up, puID_down = get_puID_SF(btag_jet, self.year)
+
 
 
             #PS weights
@@ -235,17 +249,18 @@ class Outputer_TTbar(Outputer):
 
 
 
-            gen_weight = prefire_nom * pileup_nom * btag_nom * top_ptrw_nom * mu_weights["nominal"] * np.sign(genWeight)
+            gen_weight = prefire_nom * pileup_nom * btag_nom * top_ptrw_nom * mu_weights["nominal"] *puID_nom * np.sign(genWeight) 
             sys_weights = [gen_weight, pdf_up, pdf_down, prefire_up, prefire_down, pileup_up, pileup_down, btag_up, btag_down, 
                             PS_ISR_up, PS_ISR_down, PS_FSR_up, PS_FSR_down, F_up, F_down, R_up, R_down, RF_up, RF_down, top_ptrw_up, top_ptrw_down,
-                            mu_weights['trigger_up'], mu_weights['trigger_down'], mu_weights['id_up'], mu_weights['id_down'], mu_weights['iso_up'], mu_weights['iso_down']]
+                            mu_weights['trigger_up'], mu_weights['trigger_down'], mu_weights['id_up'], mu_weights['id_down'], mu_weights['iso_up'], mu_weights['iso_down'], 
+                            puID_up, puID_down]
             #print(sys_weights)
 
 
             #clip extreme variations
             self.sys_weights[self.idx] = np.clip(np.array(sys_weights, dtype=np.float32), 1e-3, 1e3)
 
-            #self.jet1_JME_vars[self.idx] = jet1.JME_vars
+            self.jet1_JME_vars[self.idx] = jet1.JME_vars
 
 
             
@@ -263,7 +278,7 @@ class Outputer_TTbar(Outputer):
         if(jet1.subJetIdx2 >= 0):
             jet1_btag = max(jet1_btag, subjets[jet1.subJetIdx2].btagDeepB)
 
-        jet1_extraInfo = [jet1.tau1, jet1.tau2, jet1.tau3, jet1.tau4, jet1.lsf3, jet1_btag, jet1.nPFConstituents, jet1.deepTagMD_H4qvsQCD, jet1.deepTagMD_WvsQCD]
+        jet1_extraInfo = [jet1.tau1, jet1.tau2, jet1.tau3, jet1.tau4, jet1.lsf3, jet1_btag, jet1.nPFConstituents, jet1.deepTagMD_H4qvsQCD, jet1.deepTagMD_WvsQCD, jet1.deepTag_WvsQCD]
 
         j1_nPF = min(self.n_pf_cands, jet1.nPFConstituents)
         range1 = PFCandsIdxs[jet1.pf_cands_start : jet1.pf_cands_start + j1_nPF] # indices of pf cands
@@ -273,7 +288,7 @@ class Outputer_TTbar(Outputer):
             idx = conv.pFCandsIdx
             if(i > j1_nPF): break
             cand = ROOT.Math.PtEtaPhiMVector(PFCands[idx].pt, PFCands[idx].eta, PFCands[idx].phi, PFCands[idx].mass)
-            jet1_PFCands.append([cand.Px(), cand.Py(), cand.Pz(), cand.E()])
+            jet1_PFCands.append([cand.Px(), cand.Py(), cand.Pz(), cand.E(), PFCands[idx].puppiWeight, PFCands[idx].charge])
 
 
         #SV's
@@ -289,7 +304,7 @@ class Outputer_TTbar(Outputer):
         if self.sort_pfcands:
             self.jet1_PFCands[self.idx,:jet1.nPFConstituents] = self.get_pfcands_sorted(np.array(jet1_PFCands, dtype = np.float32))
         else:
-            self.jet1_PFCands[self.idx,:jet1.nPFConstituents] = np.array(jet1_PFCands, dtype = np.float16)
+            self.jet1_PFCands[self.idx,:jet1.nPFConstituents] = np.array(jet1_PFCands, dtype = np.float32)
 
         self.idx +=1
         if(self.idx % self.batch_size == 0): self.write_out()
@@ -312,7 +327,7 @@ class Outputer_TTbar(Outputer):
                 f.create_dataset("btag_jet_info", data=self.btag_jet_info, chunks = True, maxshape=(None, self.btag_jet_info.shape[1]))
                 f.create_dataset("mu_info", data=self.mu_info, chunks = True, maxshape=(None, self.mu_info.shape[1]))
                 f.create_dataset("jet1_extraInfo", data=self.jet1_extraInfo, chunks = True, maxshape=(None, self.jet1_extraInfo.shape[1]))
-                f.create_dataset("jet1_PFCands", data=self.jet1_PFCands, chunks = True, maxshape=(None, self.jet1_PFCands.shape[1], 4), compression='gzip')
+                f.create_dataset("jet1_PFCands", data=self.jet1_PFCands, chunks = True, maxshape=(None, self.jet1_PFCands.shape[1], self.jet1_PFCands.shape[2]), compression='gzip')
                 if(self.include_systematics):
                     f.create_dataset("sys_weights", data=self.sys_weights, chunks = True, maxshape=(None, self.sys_weights.shape[1]))
                     f.create_dataset("jet1_JME_vars", data=self.jet1_JME_vars, chunks = True, maxshape=(None, self.jet1_JME_vars.shape[1]))
@@ -431,11 +446,11 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
 
     btag_cut = -1.
 
-    #deepcsv medium WP's https://twiki.cern.ch/twiki/bin/viewauth/CMS/BtagRecommendation
-    if("2018" in year): btag_cut = 0.4168
-    elif("2017" in year): btag_cut = 0.4506
-    elif("2016APV" in year): btag_cut = 0.6001 #preVFP
-    elif("2016" in year): btag_cut = 0.5847 #postVFP
+    #deepJet medium WP's https://twiki.cern.ch/twiki/bin/viewauth/CMS/BtagRecommendation
+    if("2018" in year): btag_cut = 0.2783
+    elif("2017" in year): btag_cut = 0.304
+    elif("2016APV" in year): btag_cut = 0.2598 #preVFP
+    elif("2016" in year): btag_cut = 0.2489 #postVFP
     else: 
         print("invalid year! %s")
         exit1(1)
@@ -457,6 +472,7 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
 #----------------- Begin loop over files ---------------------------------
 
     for fileName in inputFileNames:
+        triggers_local = copy.copy(triggers)
 
         print("Opening file %s" % fileName)
 
@@ -518,6 +534,7 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
 
 
         entries = inTree.entries
+        printed = False
         for entry in range(entries):
 
 
@@ -538,8 +555,13 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
             if(not passFilter): 
                 continue
             
-            for trig in triggers:
-                passTrigger = passTrigger or inTree.readBranch(trig)
+            for trig in triggers_local:
+                try:
+                    passTrigger = passTrigger or inTree.readBranch(trig)
+                except:
+                    if(not printed): print("Trigger %s  not found" % trig)
+                    triggers_local.remove(trig)
+                    printed = True
 
             if(not passTrigger): continue
 
@@ -620,13 +642,13 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
             j2_ak4 = None
             pass_btag = False
             for jet in AK4Jets:
-                #jetId : bit1 = loose, bit2 = tight, bit3 = tightLepVeto
+                #jetId : bit1 = loose, bit2 = tight, bit3 = tightLepVeto. Bit order flipped for 2016UL... Anything > 1 means passes loose
                 #if(jet.jetId & 2 == 2 and jet.pt > ak4_min_pt and abs(jet.eta) < 2.4):
                 if(jet.pt > ak4_min_pt and abs(jet.eta) < 2.4):
                     jet_dR = deltaR(jet, sel_mu)
                     nAK4s +=1
                     #tightId and loose Pileup ID
-                    if (jet.jetId & 2 == 2 and jet.puId % 2 == 1 and (abs(ang_dist(sel_mu.phi, jet.phi))  < ang_cut) and jet.btagDeepB > btag_cut):
+                    if (jet.jetId & 2 == 2 and (jet.pt > 50 or jet.puId > 1) and (abs(ang_dist(sel_mu.phi, jet.phi))  < ang_cut) and jet.btagDeepFlavB > btag_cut):
                         pass_btag = True
                         btag_jet = jet
 

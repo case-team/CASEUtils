@@ -13,7 +13,7 @@ parser.add_option("--sample_type", default = "MC", help="MC or data")
 parser.add_option("-i", "--input", dest = "fin", default = '', help="Input file name")
 parser.add_option("-o", "--output", dest = "fout", default = 'test.h5', help="Output file name")
 parser.add_option("-j", "--json", default = '', help="Json file name")
-parser.add_option("-y", "--year", type=int, default = 2016, help="Year the sample corresponds to")
+parser.add_option("-y", "--year", type=str, default = "2016", help="Year the sample corresponds to")
 parser.add_option("-n", "--nEvents",  type=int, default = -1, help="Maximum number of events to output (-1 to run over whole file)")
 
 options, args = parser.parse_args()
@@ -26,7 +26,7 @@ if(".root" in options.fin): input_files = [options.fin]
 else: input_files = get_file_list(options.fin)
 
 if(options.ttbar):
-    NanoReader_TTbar(options.flag, inputFileNames = input_files, outputFileName = options.fout, json = options.json, year = str(options.year), 
+    NanoReader_TTbar(options.flag, inputFileNames = input_files, outputFileName = options.fout, json = options.json, year = options.year, 
         nEventsMax = options.nEvents, include_systematics = options.sys, do_top_ptrw = options.top_ptrw, sampleType = options.sample_type)
 else:
 
