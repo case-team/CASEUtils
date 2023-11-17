@@ -215,8 +215,9 @@ def dijetfit(options):
 
     print("\n\n ############# FIT BACKGROUND AND SAVE PARAMETERS ###########")
 
-    nParsToTry = [2, 3, 4]
-    #nParsToTry = [2,3]
+    #nParsToTry = [2, 3, 4]
+    nParsToTry = [2,3]
+    #nParsToTry = [2]
     chi2s = [0]*len(nParsToTry)
     fit_params = [0] * len(nParsToTry)
     ndofs = [0]*len(nParsToTry)
@@ -440,11 +441,11 @@ def dijetfit(options):
     sig_range = 100.0
     sig_range_str = " --setParameterRanges r=-%.1f,%.1f " % (sig_range, sig_range)
 
-
+    workspace_cmd = "text2workspace.py datacard_JJ_{l2}.txt -o workspace_JJ_{l1}_{l2}.root "
+    if(options.sig_eff_map): workspace_cmd += " -P CASE.CASEUtils.my_model:sig_eff_model "
 
     cmd = (
-        "text2workspace.py datacard_JJ_{l2}.txt "
-        + "-o workspace_JJ_{l1}_{l2}.root "
+        workspace_cmd
         + "&& combine -M FitDiagnostics workspace_JJ_{l1}_{l2}.root --cminPreFit 1 " + sig_range_str
         + "-m {mass} -n _{l1}_{l2} --robustFit 1  "
         + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root --usePLC " + sig_range_str
@@ -579,6 +580,7 @@ def dijetfit(options):
     results['asimov_signif'] = exp_signif
     results['asimov_pval'] = exp_pval
     results['pval'] = pval
+    results['sig_strength'] = sig_strength
     results['obs_excess_events'] = sig_strength*sig_norm
     results['obs_excess_events_unc'] = sig_strength_unc*sig_norm
     results['obs_lim_events'] = obs_limit*sig_norm
@@ -648,6 +650,8 @@ def fitting_options():
                       of default model (gaussian core with single crystal ball)""")
     parser.add_option("--sig_norm_unc", dest="sig_norm_unc", type=float, default= -1.0, help="Fractional uncertainty on signal normalization")
     parser.add_option("--no_sig",  default= False, action = 'store_true', help="Remove signal events from fit (using 'truth_label' key in h5)")
+
+    parser.add_option("--sig_eff_map",  default= False, action = 'store_true', help="Fancy signal efficiency map for weakly supervised")
     return parser
 
 

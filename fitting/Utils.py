@@ -580,7 +580,7 @@ def get_rebinning(binsx, histos_sb, min_count = 5):
 
 
     
-def checkSBFit(filename,label,bins,plotname, nPars, plot_dir = "", draw_sig = True, plot_label = "" ):
+def checkSBFit(filename,label,bins,plotname, nPars, plot_dir = "", variable_sig_eff = False, draw_sig = True, plot_label = "" ):
 
     roobins = ROOT.RooBinning(len(bins)-1, array('d', bins), "SB_bins")
     
