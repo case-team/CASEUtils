@@ -14,6 +14,11 @@ class Function:
         return y
 
 
+def vectorize(x):
+    v = ROOT.vector('float')()
+    for o in x:
+        v.push_back(o)
+    return v
 
 
 class VariableSigEff(PhysicsModel):
@@ -30,32 +35,30 @@ class VariableSigEff(PhysicsModel):
 
         r_var = self.modelBuilder.out.var('r')
 
-        #TODO Dynamically load these or something
-        #assume flat below zero and after max range
+        #TODO Dynamically load these values or something
+
+        #assume effiency flat below zero and after max injection
         #xs = array('d', [-maxR, 0, 0.5, 1.0, 1.5, 2.0, maxR])
         #effs = array('d', [0.01, 0.01, 0.01, 0.05, 0.2, 0.25, 0.3, 0.3, 0.3])
 
-        #xs = array('d', [-maxR, maxR])
-        #effs = array('d', [0.5, 0.5])
+        xs = [-maxR, maxR]
+        effs = [0.5, 0.5]
 
-        #RooSpline only in very recent root versions so do this work around with TF1
+        xs = vectorize(xs)
+        
+        #normalization is effs times cross section times 'norm factor' (TODO)
+        norm_factor = 1.0
+        ys = vectorize([norm_factor * effs[i] * xs[i] for i in range(len(effs))])
 
-        #f = ROOT.TF1("tf1_sig_eff_spline", Function(xs, effs), min(xs), max(xs), 0)
 
-        #Using binded TF1
-        f = ROOT.TF1("tf1_sig_eff", "0.5 * x", -2*maxR, 2*maxR)
-        func = ROOT.RooFit.bindFunction("norm", f, r_var)
-
-        #Using native RooFit Function
-        #c = ROOT.RooRealVar("c", "c", 0.5)
-        #func = ROOT.RooPolyVar("norm", "norm",  r_var, ROOT.RooArgList(c), 1)
+        #RooSpline between different injection points
+        func = ROOT.RooNCSpline_1D_fast("norm", "norm", r_var, xs, ys)
 
         getattr(self.modelBuilder.out, 'import')(func)
         self.modelBuilder.out.ls()
 
     def getYieldScale(self,bin,process):
         if 'signal' in process: return "norm"
-        #if 'signal' in process: return "halfR"
         else: return 1
 
 
