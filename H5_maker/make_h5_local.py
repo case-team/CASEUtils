@@ -12,6 +12,7 @@ parser.add_option("-o", "--output", dest = "fout", default = 'test.h5', help="Ou
 parser.add_option("-j", "--json", default = '', help="Json file name")
 parser.add_option("-y", "--year", type=int, default = 2016, help="Year the sample corresponds to")
 parser.add_option("-n", "--nEvents",  type=int, default = -1, help="Maximum number of events to output (-1 to run over whole file)")
+parser.add_option("--gen", default = "",  help="Save gen level info for this signal (options are: Qstar, Wkk, Wp, XYY, ZpToTpTp, YtoHH)")
 
 options, args = parser.parse_args()
 
@@ -25,5 +26,5 @@ if(options.ttbar):
 else:
 
     NanoReader(options.flag, inputFileNames = [options.fin], outputFileName = options.fout, json = options.json, year = options.year, 
-        nEventsMax = options.nEvents, include_systematics = options.sys, do_top_ptrw = options.top_ptrw)
+        nEventsMax = options.nEvents, include_systematics = options.sys, do_top_ptrw = options.top_ptrw, gen_label = options.gen)
 

@@ -60,7 +60,7 @@ btag score (max deepB score of ak4 subjets) and number of PF constituents for j1
 padded
 
 
-If `--sys` flag is used, additional corrections are applied and dditional columns with info necessary for systematics
+If `--sys` flag is used, additional corrections are applied and additional columns with info necessary for systematics
 computation are added
 
 **sys\_weights** 21 floats: See `sys_weights_map` dictionary inside H5\_maker.py for map of variable name to index. 
@@ -77,6 +77,15 @@ variations.
         ```[pt_JES_up, m_JES_up, pt_JES_down, m_JES_down, pt_JER_up, m_JER_up, pt_JER_down, m_JER_down, m_JMS_up, m_JMS_down, m_JMR_up, m_JMR_down]```
 
 Variations of the **preselection\_eff** for JES and JER systematic variations are also saved (eg `preselection_eff_JES_up`)
+
+**gen_info** (N_Prongs, 4) floats : 
+If the `--gen` flag is used (followed by a label for a specific signal), additional generator level information 
+is included. For signals, generator level information (specifically the 4-vectors of the
+quarks that make each prong of the boosted jet) is needed for the Lund reweighting
+procedure. One can use the `--gen` flag followed by the correct flag for
+the signal you are running on in order to save the correct information. 
+The size of the **gen_info** column depends on the number of prongs in the signal being run on.
+The labels for the currently implemented signals are `Qstar, Wkk, Wp, XYY, ZpToTpTp, YtoHH`. 
 
 
 
