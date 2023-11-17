@@ -167,6 +167,9 @@ def get_pull_hist(model, frame, central, curve,  hresid, fit_hist, bins):
 
 def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvname, plot_dir, has_sig = False, draw_sig = False, plot_label = "", ratio_unc = None):
 
+    sim = False
+    #sim = True
+
     c1 =ROOT.TCanvas("c1","",800,800)
     c1.SetLogy()
     c1.Divide(1,2,0,0,0)
@@ -176,6 +179,7 @@ def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvn
     p11_1.SetPad(0.01,0.26,0.99,0.98)
     p11_1.SetLogy()
     p11_1.SetRightMargin(0.05)
+
 
 
 
@@ -214,7 +218,9 @@ def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvn
     legend2.SetFillColor(0)
     legend2.SetFillStyle(0)
     legend2.SetMargin(0.35)
-    legend.AddEntry(frame.findObject(data_name),"Data","lpe")
+    data_label = "Data"
+    if(sim): data_label = "Simulated Pseudodata"
+    legend.AddEntry(frame.findObject(data_name),data_label,"lpe")
     if(len(pdf_names[0]) > 1):
         fit_name = pdf_names[0]
     else: fit_name = pdf_names
@@ -242,18 +248,22 @@ def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvn
     legend2.Draw("same")
     legend.Draw("same")
 
-    pt = ROOT.TPaveText(0.18,0.06,0.54,0.17,"NDC")
+    pt = ROOT.TPaveText(0.6,0.42,0.9,0.52,"NDC")
     pt.SetTextFont(42)
     pt.SetTextAlign(12)
     pt.SetFillColor(0)
     pt.SetBorderSize(0)
     pt.SetFillStyle(0)
     if(ndof > 0): 
-        pt.AddText("Chi2/ndf = %.2f/%i = %.2f"%(chi2,ndof,chi2/ndof))
+        pt.AddText("#chi^{2}/ndf = %.2f/%i = %.2f"%(chi2,ndof,chi2/ndof))
         pt.AddText("Prob = %.3f"%ROOT.TMath.Prob(chi2,ndof))
     pt.Draw()
 
-    pt2 = ROOT.TPaveText(0.5,0.8,0.6,0.9,"NDC")
+    if(sim):
+        #plot_label = "Inclusive: X #rightarrow YY, #sigma=24 fb"
+        plot_label = "TNT: X #rightarrow YY, #sigma=24 fb"
+        #plot_label = "TNT: Background Only"
+    pt2 = ROOT.TPaveText(0.35,0.73,0.75,0.93,"NDC")
     pt2.SetTextFont(42)
     pt2.SetTextAlign(22)
     pt2.SetFillColor(0)
@@ -290,6 +300,10 @@ def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvn
     pulls.Draw("same hist")
     line = ROOT.TLine(frame.GetXaxis().GetXmin() , 0 , frame.GetXaxis().GetXmax(),0)
     line.Draw("same")
+
+    if(sim):
+        CMS_lumi.CMS_lumi(p11_1, 0, 0)
+
     c1.Update()
 
     canvname+='.png'
@@ -439,13 +453,19 @@ def get_mjj_max(h_file):
         return np.amax(mjj)
 
 
-def load_h5_sb(h_file, hist, correctStats=False, sb1_edge = -1., sb2_edge = -1.):
+def load_h5_sb(h_file, hist, correctStats=False, no_sig = False):
     event_num = None
     with h5py.File(h_file, "r") as f:
         mjj = np.array(f['mjj'][()])
+        if(no_sig): is_sig = f['truth_label'][()]
         if(correctStats):
             event_num = f['event_num'][()]
 
+    if(no_sig):
+        print("Filtering out signal events!")
+        mask = (is_sig < 0.1)
+        print(np.mean(mask))
+        mjj= mjj[mask]
     fill_hist(mjj, hist, event_num)
 
 def load_h5_bkg(h_file, hist, correctStats = False):
@@ -624,8 +644,11 @@ def checkSBFit(filename,label,bins,plotname, nPars, plot_dir = "", draw_sig = Tr
         #model.getPdf(pdf_name).plotOn(frame,ROOT.RooFit.Components("shapeBkg_model_qcd_mjj_JJ_raw"), ROOT.RooFit.VisualizeError(fres, 1, linear_errors), 
                 #ROOT.RooFit.LineColor(ROOT.kMagenta + 3), ROOT.RooFit.FillColor(ROOT.kMagenta), fit_norm)
 
+        #bkg_color = ROOT.kMagenta + 3
+        bkg_color = ROOT.kOrange - 8
+
         model.getPdf(pdf_name).plotOn(frame,ROOT.RooFit.Components("shapeSig_model_signal_mjj_JJ_raw"), ROOT.RooFit.LineColor(ROOT.kBlue),ROOT.RooFit.Name("Signal"), fit_norm)
-        model.getPdf(pdf_name).plotOn(frame,ROOT.RooFit.Components("shapeBkg_model_qcd_mjj_JJ_raw"), ROOT.RooFit.LineColor(ROOT.kMagenta + 3),ROOT.RooFit.Name("Background"), fit_norm)
+        model.getPdf(pdf_name).plotOn(frame,ROOT.RooFit.Components("shapeBkg_model_qcd_mjj_JJ_raw"), ROOT.RooFit.LineColor(bkg_color),ROOT.RooFit.Name("Background"), fit_norm)
 
     model.getPdf(pdf_name).plotOn(frame,ROOT.RooFit.LineColor(ROOT.kRed+1),ROOT.RooFit.Name("model_s"), fit_norm)
 

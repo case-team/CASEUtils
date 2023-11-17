@@ -10,7 +10,7 @@ cmsText     = "CMS";
 cmsTextFont   = 61  
 
 writeExtraText = True
-extraText   = "Preliminary"
+extraText   = "Simulation Preliminary"
 extraTextFont = 52 
 
 lumiTextSize     = 0.6
@@ -19,7 +19,7 @@ lumiTextOffset   = 0.2
 cmsTextSize      = 0.75
 cmsTextOffset    = 0.1
 
-relPosX    = 0.045
+relPosX    = 0.16
 relPosY    = 0.035
 relExtraDY = 1.2
 
@@ -28,7 +28,7 @@ extraOverCmsTextSize  = 0.76
 lumi_13TeV = "20.1 fb^{-1}"
 lumi_8TeV  = "19.7 fb^{-1}" 
 lumi_7TeV  = "5.1 fb^{-1}"
-lumi_sqrtS = ""
+lumi_sqrtS = "(13 TeV)"
 
 drawLogo      = False
 

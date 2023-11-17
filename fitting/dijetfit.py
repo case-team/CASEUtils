@@ -182,7 +182,7 @@ def dijetfit(options):
     histos_sb = ROOT.TH1F("mjj_sb", "mjj_sb" ,nbins_fine, binsx[0], binsx[-1])
     
     
-    load_h5_sb(options.inputFile, histos_sb)
+    load_h5_sb(options.inputFile, histos_sb, no_sig = options.no_sig)
     print("************ Found %i total events \n" % histos_sb.GetEntries())
     print(histos_sb.Integral())
 
@@ -214,10 +214,9 @@ def dijetfit(options):
 
 
     print("\n\n ############# FIT BACKGROUND AND SAVE PARAMETERS ###########")
-    #nParsToTry = [2, 3, 4, 5]
 
     nParsToTry = [2, 3, 4]
-    #nParsToTry = [2]
+    #nParsToTry = [2,3]
     chi2s = [0]*len(nParsToTry)
     fit_params = [0] * len(nParsToTry)
     ndofs = [0]*len(nParsToTry)
@@ -438,18 +437,21 @@ def dijetfit(options):
     card.makeCard()
     card.delete()
 
+    sig_range = 100.0
+    sig_range_str = " --setParameterRanges r=-%.1f,%.1f " % (sig_range, sig_range)
+
 
 
     cmd = (
         "text2workspace.py datacard_JJ_{l2}.txt "
         + "-o workspace_JJ_{l1}_{l2}.root "
-        + "&& combine -M FitDiagnostics workspace_JJ_{l1}_{l2}.root --cminPreFit 1 --setParameterRanges r=-1000.0,1000.0 "
+        + "&& combine -M FitDiagnostics workspace_JJ_{l1}_{l2}.root --cminPreFit 1 " + sig_range_str
         + "-m {mass} -n _{l1}_{l2} --robustFit 1  "
-        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root --usePLC --setParameterRanges r=-1000.0,1000.0 "
+        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root --usePLC " + sig_range_str
         + "-m {mass} -n significance_{l1}_{l2} "
-        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root --usePLC --setParameterRanges r=-1000.0,1000.0 "
+        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root --usePLC " + sig_range_str
         + "-m {mass} --pvalue -n pvalue_{l1}_{l2} "
-        + "&& combine -M AsymptoticLimits workspace_JJ_{l1}_{l2}.root --setParameterRanges r=-1000.0,1000.0 "
+        + "&& combine -M AsymptoticLimits workspace_JJ_{l1}_{l2}.root " + sig_range_str
         + "-m {mass} -n lim_{l1}_{l2}"
         ).format(mass=mass, l1=label, l2=sb_label)
     print(cmd)
@@ -496,7 +498,7 @@ def dijetfit(options):
     true_sig_strength = get_sig_in_window(options.inputFile, binsx[0], binsx[-1]) /  sig_norm
     print("True sig strength %.3f" % true_sig_strength)
 
-    cmd = ("combine -M Significance workspace_JJ_{l1}_{l2}.root -t -1 --expectSignal %.3f --toysFreq --setParameterRanges r=-1000.0,1000.0 " % (true_sig_strength)
+    cmd = ("combine -M Significance workspace_JJ_{l1}_{l2}.root -t -1 --expectSignal %.3f --toysFreq "% (true_sig_strength) 
         + "-m {mass} -n _exp_significance_{l1}_{l2} ").format(mass = mass, l1 = label, l2 = sb_label)
     print(cmd)
     os.system(cmd)
@@ -645,6 +647,7 @@ def fitting_options():
                       help="""Whether to use double crystal ball model instead
                       of default model (gaussian core with single crystal ball)""")
     parser.add_option("--sig_norm_unc", dest="sig_norm_unc", type=float, default= -1.0, help="Fractional uncertainty on signal normalization")
+    parser.add_option("--no_sig",  default= False, action = 'store_true', help="Remove signal events from fit (using 'truth_label' key in h5)")
     return parser
 
 
