@@ -263,7 +263,9 @@ def PlotFitResults(frame,fitErrs,nPars,pulls,data_name,pdf_names,chi2,ndof,canvn
         #plot_label = "Inclusive: X #rightarrow YY, #sigma=24 fb"
         plot_label = "TNT: X #rightarrow YY, #sigma=24 fb"
         #plot_label = "TNT: Background Only"
-    pt2 = ROOT.TPaveText(0.35,0.73,0.75,0.93,"NDC")
+        pt2 = ROOT.TPaveText(0.35,0.73,0.75,0.93,"NDC")
+    else:
+        pt2 = ROOT.TPaveText(0.5, 0.73, 0.6, 0.93,"NDC")
     pt2.SetTextFont(42)
     pt2.SetTextAlign(22)
     pt2.SetFillColor(0)

@@ -60,17 +60,17 @@ def fit_signalmodel(input_file, sig_file_name, mass, x_bins, fine_bins,
     mjj_fine.setBins(len(bins_sig_fit))
 
     chi2_fine = fitter.projection("model_s", "data", "mjj_fine",
-                                  plot_dir + plot_label + "signal_fit.png")
+                                  plot_label + "signal_fit.png")
 
     fitter.projection("model_s", "data", "mjj_fine",
-                      plot_dir + plot_label +  "signal_fit_log.png", 0, True)
+                      plot_label +  "signal_fit_log.png", 0, True)
 
     chi2 = fitter.projection("model_s", "data", "mjj_fine",
-                             plot_dir + plot_label + "signal_fit_binned.png",
+                             plot_label + "signal_fit_binned.png",
                              roobins_sig_fit)
 
     fitter.projection("model_s", "data", "mjj_fine",
-                      plot_dir + plot_label + "signal_fit_log_binned.png",
+                      plot_label + "signal_fit_log_binned.png",
                       roobins_sig_fit, logy=True)
 
     sig_outfile.cd()
@@ -131,6 +131,9 @@ def dijetfit(options):
         #remove old results
         os.system("rm %s" % plot_dir + "fit_results_{}.json".format(options.mass))
 
+
+    os.chdir(plot_dir)
+    ROOT.gSystem.cd(plot_dir)
     fine_bin_size = 4
     mass = options.mass 
 
@@ -215,8 +218,8 @@ def dijetfit(options):
 
     print("\n\n ############# FIT BACKGROUND AND SAVE PARAMETERS ###########")
 
-    #nParsToTry = [2, 3, 4]
-    nParsToTry = [2,3]
+    nParsToTry = [2, 3, 4]
+    #nParsToTry = [2,3]
     #nParsToTry = [2]
     chi2s = [0]*len(nParsToTry)
     fit_params = [0] * len(nParsToTry)
@@ -251,7 +254,7 @@ def dijetfit(options):
 
         chi2_fine = fitter_QCD.projection(
             model_name, data_name, "mjj_fine",
-            plot_dir + str(nPars) + "par_qcd_fit.png", 0, True)
+            str(nPars) + "par_qcd_fit.png", 0, True)
 
         #chi2_binned = fitter_QCD.projection(
         #     model_name, data_name, "mjj_fine",
@@ -344,7 +347,7 @@ def dijetfit(options):
                        [model_name], my_chi2, my_ndof,
                        str(nPars) + "par_qcd_fit_binned{}".format(
                            "_blinded" if options.blinded else ""),
-                       plot_dir, plot_label = label)
+                       "", plot_label = label)
 
         graphs = {}
         for p in range(nPars):
@@ -399,6 +402,8 @@ def dijetfit(options):
     #histos_qcd.Print("range")
     #histos_sig.Print("range")
 
+
+    #sb_fname = "%s/sb_fit.root" % plot_dir
     sb_fname = "sb_fit.root"
     sb_outfile = ROOT.TFile(sb_fname, 'RECREATE')
     sb_outfile.cd()
@@ -419,6 +424,8 @@ def dijetfit(options):
         card.addSystematic("SigEff", "lnN", values = {"model_signal_mjj" : 1. + options.sig_norm_unc})
 
 
+    if(options.sig_eff_map): options.sig_norm = 100.0
+
     sig_norm = card.addFixedYieldFromFile('model_signal_mjj', 0, sig_file_name,
                                           "mjj_sig", norm = options.sig_norm)
     #sig_norm = card.addFloatingYield('model_signal_mjj', 0, sig_file_name,
@@ -432,34 +439,41 @@ def dijetfit(options):
         card.addSystematic("CMS_JJ_p%i" % i, "flatParam", [])
 
     card.addSystematic("model_qcd_mjj_JJ_norm", "flatParam", [])
-    card.importBinnedData("sb_fit.root", sig_data_name,
+    card.importBinnedData(sb_fname, sig_data_name,
                           ["mjj"], 'data_obs', 1.0)
 
     card.makeCard()
     card.delete()
 
-    sig_range = 100.0
-    sig_range_str = " --setParameterRanges r=-%.1f,%.1f " % (sig_range, sig_range)
 
-    workspace_cmd = "text2workspace.py datacard_JJ_{l2}.txt -o workspace_JJ_{l1}_{l2}.root "
-    if(options.sig_eff_map): workspace_cmd += " -P CASE.CASEUtils.my_model:sig_eff_model "
+
+    card_name =  "datacard_JJ_%s.txt" % (sb_label)
+    workspace_name ="workspace_JJ_%s_%s.root" %(label, sb_label)
+
+    workspace_cmd = "text2workspace.py {card} -o {ws} "
+    if(options.sig_eff_map): 
+        workspace_cmd += " -P CASE.CASEUtils.my_model:sig_eff_model "
+        sig_range_str = ""
+    else:
+        sig_range = 1000.0
+        sig_range_str = " --setParameterRanges r=-%.1f,%.1f " % (sig_range, sig_range)
 
     cmd = (
         workspace_cmd
-        + "&& combine -M FitDiagnostics workspace_JJ_{l1}_{l2}.root --cminPreFit 1 " + sig_range_str
+        + "&& combine -M FitDiagnostics {ws} --cminDefaultMinimizerTolerance 2.0 " + sig_range_str
         + "-m {mass} -n _{l1}_{l2} --robustFit 1  "
-        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root --usePLC " + sig_range_str
+        + "&& combine -M Significance {ws} --usePLC " + sig_range_str
         + "-m {mass} -n significance_{l1}_{l2} "
-        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root --usePLC " + sig_range_str
+        + "&& combine -M Significance {ws} --usePLC " + sig_range_str
         + "-m {mass} --pvalue -n pvalue_{l1}_{l2} "
-        + "&& combine -M AsymptoticLimits workspace_JJ_{l1}_{l2}.root " + sig_range_str
+        + "&& combine -M AsymptoticLimits {ws} " + sig_range_str
         + "-m {mass} -n lim_{l1}_{l2}"
-        ).format(mass=mass, l1=label, l2=sb_label)
+        ).format(mass=mass, l1=label, l2=sb_label, ws=workspace_name, card=card_name)
     print(cmd)
     os.system(cmd)
-    workspace_name = 'workspace_JJ_{l1}_{l2}.root'.format(l1=label, l2=sb_label)
+
     sbfit_chi2, sbfit_ndof = checkSBFit(workspace_name, sb_label, bins, label + "_" + sb_label, nPars_QCD, 
-            plot_dir = plot_dir, draw_sig = options.draw_sig, plot_label = label)
+            plot_dir = "", draw_sig = options.draw_sig, plot_label = label)
 
     sbfit_prob = ROOT.TMath.Prob(sbfit_chi2, sbfit_ndof)
 
@@ -491,26 +505,29 @@ def dijetfit(options):
     sig_strength_unc = params.rErr
 
 
-    #expected significance
-    print('sig_norm %.3f' % sig_norm)
+    if(not options.sig_eff_map): 
+    #expected significance, doesn't work with varying signal efficiency map
+        print('sig_norm %.3f' % sig_norm)
 
+        true_sig_strength = get_sig_in_window(options.inputFile, binsx[0], binsx[-1]) /  sig_norm
+        print("True sig strength %.3f" % true_sig_strength)
 
+        cmd = ("combine -M Significance workspace_JJ_{l1}_{l2}.root -t -1 --expectSignal %.3f --toysFreq "% (true_sig_strength) 
+            + "-m {mass} -n _exp_significance_{l1}_{l2} ").format(mass = mass, l1 = label, l2 = sb_label)
+        print(cmd)
+        os.system(cmd)
 
-    true_sig_strength = get_sig_in_window(options.inputFile, binsx[0], binsx[-1]) /  sig_norm
-    print("True sig strength %.3f" % true_sig_strength)
+        f_exp_signif = ROOT.TFile(f_exp_signif_name, "READ")
+        res_e = f_exp_signif.Get("limit")
+        res_e.GetEntry(0)
+        exp_signif = res_e.limit
 
-    cmd = ("combine -M Significance workspace_JJ_{l1}_{l2}.root -t -1 --expectSignal %.3f --toysFreq "% (true_sig_strength) 
-        + "-m {mass} -n _exp_significance_{l1}_{l2} ").format(mass = mass, l1 = label, l2 = sb_label)
-    print(cmd)
-    os.system(cmd)
-
-    f_exp_signif = ROOT.TFile(f_exp_signif_name, "READ")
-    res_e = f_exp_signif.Get("limit")
-    res_e.GetEntry(0)
-    exp_signif = res_e.limit
-
-    exp_pval = 0.5-(0.5*(1+ROOT.Math.erf(exp_signif/np.sqrt(2)))-0.5*(1+ROOT.Math.erf(0/np.sqrt(2))))
-    print("Asimov significance is %.3f \n" % exp_signif)
+        exp_pval = 0.5-(0.5*(1+ROOT.Math.erf(exp_signif/np.sqrt(2)))-0.5*(1+ROOT.Math.erf(0/np.sqrt(2))))
+        print("Asimov significance is %.3f \n" % exp_signif)
+    else:
+        print("Skipping asimov signif")
+        exp_signif = 0
+        exp_pval = 1.0
 
 
     f_limit = ROOT.TFile(f_limit_name, "READ")
@@ -535,6 +552,8 @@ def dijetfit(options):
         elif(abs(res2.quantileExpected - 0.975) < eps):  # 2sigma, high
             exp_two_high = res2.limit
 
+    if(options.sig_eff_map):
+        sig_norm = 1 #just report cross sections
     print("Obs limit is %.3f (%.1f events)" % (obs_limit, obs_limit*sig_norm))
     print("Expected was %.3f (%.1f events)" % (exp_limit, exp_limit*sig_norm))
     print("Expected range %.1f-%.1f (one sigma), %.1f-%.1f (two sigma)" % (exp_low * sig_norm, exp_high*sig_norm, exp_two_low * sig_norm, exp_two_high * sig_norm))
@@ -596,11 +615,11 @@ def dijetfit(options):
     results['script_options'] = vars(options)
 
     print("Saving fit results to %s" % plot_dir + "fit_results_{}.pkl".format(options.mass))
-    with open(plot_dir + "fit_results_{}.pkl".format(options.mass), "w") as f:
+    with open("fit_results_{}.pkl".format(options.mass), "w") as f:
         pickle.dump(results, f)
         
     print("Also saving fit results to %s" % plot_dir + "fit_results_{}.json".format(options.mass))
-    with open(plot_dir + "fit_results_{}.json".format(options.mass), "w") as jsonfile:
+    with open("fit_results_{}.json".format(options.mass), "w") as jsonfile:
         json.dump(results, jsonfile, indent=4)
 
     return results
