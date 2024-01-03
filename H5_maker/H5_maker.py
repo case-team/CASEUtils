@@ -119,7 +119,7 @@ class Outputer:
         self.jet1_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
         self.jet2_extraInfo = np.zeros((self.batch_size, 7), dtype=np.float32)
         self.jet_kinematics = np.zeros((self.batch_size, 14), dtype=np.float32)
-        self.event_info = np.zeros((self.batch_size, 8), dtype=np.float32)
+        self.event_info = np.zeros((self.batch_size, 9), dtype=np.float64)
         self.sys_weights = np.zeros((self.batch_size, 21), dtype=np.float32)
         self.jet1_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
         self.jet2_JME_vars = np.zeros((self.batch_size, 12), dtype=np.float32)
@@ -201,9 +201,10 @@ class Outputer:
         MET_phi = inTree.readBranch('MET_phi')
         eventNum = inTree.readBranch('event')
         run = inTree.readBranch('run')
+        lumiBlock = inTree.readBranch('luminosityBlock')
         SVs = Collection(event, 'FatJetSVs')
 
-        event_info = [eventNum, MET, MET_phi, genWeight, leptonic_decay, run, self.year, num_jets]
+        event_info = [eventNum, MET, MET_phi, genWeight, leptonic_decay, run, self.year, num_jets, lumiBlock]
 
 
 
@@ -375,7 +376,7 @@ class Outputer:
 
 
 
-        self.event_info[self.idx] = np.array(event_info, dtype=np.float32)
+        self.event_info[self.idx] = np.array(event_info, dtype=np.float64)
         self.jet_kinematics[self.idx] = np.array(jet_kinematics, dtype = np.float32)
         self.jet1_extraInfo[self.idx] = np.array(jet1_extraInfo, dtype = np.float32)
         self.jet2_extraInfo[self.idx] = np.array(jet2_extraInfo, dtype = np.float32)
