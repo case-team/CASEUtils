@@ -24,6 +24,7 @@ top_ID = 6
 W_ID = 24
 B_ID = 5
 MAXLEP_ID = 16
+MAXLIGHTQUARK_ID = 5
 
 #from cris https://github.com/farakiko/boostedhiggs/blob/main/boostedhiggs/corrections.py#L231
 lepton_corrections = {
@@ -243,10 +244,10 @@ def get_pileup_weight(year, nPU):
 
 
 
-def isFinal(statusFlag):
-    #check if isLastCopy flag is set
-    mask = 1 << 13 #13th bit of status flag
-    return (statusFlag & mask) != 0
+def isFinal(genPart):
+    #check if isLastCopy flag is set (Pythia)
+    mask = 1 << 13 #13th bit of status flag 
+    return (genPart.statusFlags & mask) != 0
 
 
 def get_top_ptrw(event, top = None, anti_top = None):
@@ -257,7 +258,7 @@ def get_top_ptrw(event, top = None, anti_top = None):
         GenPartsColl = Collection(event, "GenPart")
 
         for genPart in GenPartsColl:
-            if(abs(genPart.pdgId) == top_ID and isFinal(genPart.statusFlags)):
+            if(abs(genPart.pdgId) == top_ID and isFinal(genPart)):
                 if(genPart.pdgId > 0): 
                     if(top is None): top = genPart
                     else: print("WARNING : Extra top ? ")
@@ -269,19 +270,29 @@ def get_top_ptrw(event, top = None, anti_top = None):
             print("Couldnt find ttbar pair !")
             return 1.0, 1.0, 1.0
     
-    alpha = 0.0615
-    beta = 0.0005
+    #NNLO-NLO weights
+    #https://twiki.cern.ch/twiki/bin/viewauth/CMS/TopPtReweighting#TOP_PAG_corrections_based_on_the
+    A = 0.103
+    B = 0.0118
+    C = 0.000134
+    D = 0.973
 
-    top_pt = min(top.pt, 500.)
-    anti_top_pt = min(anti_top.pt, 500.)
 
     #factors to correct normalization of up and down variations
-    up_norm_factor = 0.941
-    down_norm_factor = 1.064
+    #up_norm_factor = 0.941
+    #down_norm_factor = 1.064
+    up_norm_factor = 1.0
+    down_norm_factor = 1.0
 
-    nom = np.exp(alpha - beta * top_pt) * np.exp(alpha - beta * anti_top_pt)
-    up = np.exp(alpha - 1.5 * beta * top_pt) * np.exp(alpha - 1.5 * beta * anti_top_pt) / nom / up_norm_factor
-    down = np.exp(alpha - 0.5 * beta * top_pt) * np.exp(alpha - 0.5 * beta * anti_top_pt) / nom /down_norm_factor
+    nom1 = A * np.exp(-B * top_pt) - C * top_pt + D
+    nom2 = A * np.exp(-B * anti_top_pt) - C * anti_top_pt + D
+
+    nom = (nom1 * nom2)**(0.5)
+    print('top pt rw', nom)
+    up = down = nom
+
+    #up = np.exp(alpha - 1.5 * beta * top_pt) * np.exp(alpha - 1.5 * beta * anti_top_pt) / nom / up_norm_factor
+    #down = np.exp(alpha - 0.5 * beta * top_pt) * np.exp(alpha - 0.5 * beta * anti_top_pt) / nom /down_norm_factor
 
     #print(top_pt, anti_top_pt, nom)
 
@@ -294,62 +305,175 @@ def get_parent_top(coll, p):
     if(abs(mother.pdgId) == top_ID): return p.genPartIdxMother
     return get_parent_top(coll, mother)
 
+def get_Wkk_gen_parts(event, verbose = False, herwig = False):
+    GenPartsColl = Collection(event, "GenPart")
+
+    radion = W1 = W2 = W_ISO = None
+    WKK_ID = 9000024
+    RADION_ID = 9000025
+    qs_iso = []
+    qs_radion = []
 
 
-def get_ttbar_gen_parts(event, ak8_jet):
+    for i, gen_part in enumerate(GenPartsColl):
+        m = GenPartsColl[gen_part.genPartIdxMother]
+        if(abs(gen_part.pdgId) == WKK_ID):
+            Wkk = gen_part
+        elif( (gen_part.genPartIdxMother < 0 or abs(m.pdgId) == WKK_ID or abs(m.pdgId) <= MAXLIGHTQUARK_ID) and abs(gen_part.pdgId) == W_ID ): 
+            W_ISO = gen_part
+        elif(gen_part.genPartIdxMother >= 0):
+            if(abs(gen_part.pdgId) == RADION_ID ): radion = gen_part
+            elif(abs(m.pdgId) == RADION_ID and abs(gen_part.pdgId) == W_ID): 
+                if(W1 is None): W1 = gen_part
+                elif(W2 is None): W2 = gen_part
+                else: print("Extra W!")    
+
+
+    #follow the chain to get final W's
+    for gen_part in GenPartsColl:
+        mother = GenPartsColl[gen_part.genPartIdxMother] if gen_part.genPartIdxMother >= 0 else gen_part
+        if(abs(gen_part.pdgId) == W_ID):
+            if(mother is W_ISO): W_ISO = gen_part
+            elif(mother is W1): W1 = gen_part
+            elif(mother is W2): W2 = gen_part
+
+
+    #find quarks from W decays
+    for gen_part in GenPartsColl:
+        if(abs(gen_part.pdgId) <= MAXLEP_ID):
+            mother = GenPartsColl[gen_part.genPartIdxMother] if gen_part.genPartIdxMother >= 0 else gen_part
+            if(mother is W_ISO): qs_iso.append((gen_part))
+            elif(mother is W1 or mother is W2): qs_radion.append((gen_part))
+
+    #gen matching isn't perfect, do some attempt at cleanup here
+
+    if(len(qs_iso) != 2 or len(qs_radion) != 4):
+        print("Issue in quark finding!")
+        print('Ws', W_ISO, W1, W2)
+        print(qs_iso)
+        print(qs_radion)
+        for i,gen_part in enumerate(GenPartsColl):
+            print(i, gen_part.pdgId, gen_part.genPartIdxMother, gen_part.pt, gen_part.eta, gen_part.phi, gen_part.mass )
+
+
+
+    qs_iso_vecs =  [ [gen_part.pt, gen_part.eta, gen_part.phi, gen_part.pdgId] for gen_part in qs_iso[:2] ]
+    qs_radion_vecs =  [ [gen_part.pt, gen_part.eta, gen_part.phi, gen_part.pdgId] for gen_part in qs_radion[:4] ]
+
+    #zero pad if we missed some quarks
+    while(len(qs_iso_vecs) < 2): qs_iso_vecs.append([-1.0, 0.0, 0.0, 0])
+    while(len(qs_radion_vecs) < 4): qs_radion_vecs.append([-1.0, 0.0, 0.0, 0])
+
+    return radion, W_ISO, qs_radion_vecs + qs_iso_vecs
+
+
+
+def get_ttbar_gen_parts(event, ak8_jet, herwig = False, verbose = True):
+    #herwig doesn't use same status codes 
 
     GenPartsColl = Collection(event, "GenPart")
 
-    top = anti_top = W = anti_W = fermion = anti_fermion = b_quark = None
+    top = anti_top = W = anti_W = fermion1 = anti_fermion1 = b_quark1 = fermion2 = anti_fermion2 = b_quark2 = None
 
+    if(herwig):
+        count = 0
+        for genPart in GenPartsColl:
+            #print(count, genPart.pdgId, genPart.pt, genPart.genPartIdxMother)
+            count+=1
+            mother = GenPartsColl[genPart.genPartIdxMother] if genPart.genPartIdxMother >= 0 else genPart
 
-    for genPart in GenPartsColl:
-        #tops
-        if(abs(genPart.pdgId) == top_ID and isFinal(genPart.statusFlags)):
-            if(genPart.pdgId > 0): 
-                if(top is None): top = genPart
-                else: print("WARNING : Extra top ? ")
-            else: 
-                if(anti_top is None): anti_top = genPart
-                else: print("WARNING : Extra antitop ? ")
-        m = genPart.genPartIdxMother
-        #W's
-        if(abs(genPart.pdgId) == W_ID and isFinal(genPart.statusFlags)):
-            if(genPart.pdgId > 0): 
-                if(W is None): W = genPart
-                else: print("WARNING : Extra W ? ")
-            else: 
-                if(anti_W is None): anti_W = genPart
-                else: print("WARNING : Extra anti W ? ")
+            #Find tops that decay to W's
+            if(abs(genPart.pdgId) == W_ID and abs(mother.pdgId) == top_ID and mother.pt > 15.):
+                if(genPart.pdgId > 0): 
+                    if(W is None): 
+                        W = genPart
+                        top = mother
+                    else: print("WARNING : Extra W ? ")
+                else: 
+                    if(anti_W is None): 
+                        anti_W = genPart
+                        anti_top = mother
+                    else: print("WARNING : Extra anti W ? ")
+
+        #follow the chain to get final W
+        for genPart in GenPartsColl:
+            mother = GenPartsColl[genPart.genPartIdxMother] if genPart.genPartIdxMother >= 0 else genPart
+            if(abs(genPart.pdgId) == W_ID and ((mother is W) or (mother is anti_W))):
+                if(genPart.pdgId > 0): W = genPart
+                else: anti_W = genPart
+
+    else: # Pythia 
+        for genPart in GenPartsColl:
+            #tops
+            if(abs(genPart.pdgId) == top_ID and isFinal(genPart)):
+                if(genPart.pdgId > 0): 
+                    if(top is None): top = genPart
+                    else: print("WARNING : Extra top ? ")
+                else: 
+                    if(anti_top is None): anti_top = genPart
+                    else: print("WARNING : Extra antitop ? ")
+            m = genPart.genPartIdxMother
+            #W's
+            if(abs(genPart.pdgId) == W_ID and isFinal(genPart)):
+                if(genPart.pdgId > 0): 
+                    if(W is None): W = genPart
+                    else: print("WARNING : Extra W ? ")
+                else: 
+                    if(anti_W is None): anti_W = genPart
+                    else: print("WARNING : Extra anti W ? ")
+
 
     if(top is None or anti_top is None or W is None or anti_W is None):
-        print("Couldnt find top or W: ")
-        print(top, anti_top, W, anti_W)
+        #print("Couldnt find top or W: ")
+        #print(top, anti_top, W, anti_W)
+        #count = 0
+        #for genPart in GenPartsColl:
+        #    print(count, genPart.pdgId, genPart.pt, genPart.genPartIdxMother)
+        #    count+=1
+        return top, anti_top, W, anti_W, fermion1, anti_fermion1, b_quark1, fermion2, anti_fermion2, b_quark2
     else:
-        close_W, close_top = (W,top) if (deltaR(W, ak8_jet) < deltaR(anti_W, ak8_jet)) else (anti_W,anti_top)
+        if(ak8_jet is not None):
+            close_W, close_top, other_W, other_top = (W,top, anti_W, anti_top) if (deltaR(W, ak8_jet) < deltaR(anti_W, ak8_jet)) else (anti_W,anti_top, W, top)
+        else:
+            close_W, close_top, other_W, other_top = W, top, anti_W, anti_top
 
 
 
     for genPart in GenPartsColl:
         #quarks or leptons from W decay
         m = genPart.genPartIdxMother
-        if(abs(genPart.pdgId) <= MAXLEP_ID and m > 0 and GenPartsColl[m] is close_W):
+        w_mother_match = (GenPartsColl[m] is close_W)
+        anti_w_mother_match  = (GenPartsColl[m] is other_W)
+        if(abs(genPart.pdgId) <= MAXLEP_ID and m > 0 and w_mother_match):
             if(genPart.pdgId > 0): 
-                if(fermion is None): fermion = genPart
-                else: print("WARNING : Extra quark ? ")
+                if(fermion1 is None): fermion1 = genPart
+                elif(verbose): print("WARNING : Extra quark ? ")
             else: 
-                if(anti_fermion is None): anti_fermion = genPart
-                else: print("WARNING : Extra anti quark ? ")
+                if(anti_fermion1 is None): anti_fermion1 = genPart
+                elif(verbose): print("WARNING : Extra anti quark ? ")
+
+        elif(abs(genPart.pdgId) <= MAXLEP_ID and m > 0 and anti_w_mother_match):
+            if(genPart.pdgId > 0): 
+                if(fermion2 is None): fermion2 = genPart
+                elif(verbose): print("WARNING : Extra quark ? ")
+            else: 
+                if(anti_fermion2 is None): anti_fermion2 = genPart
+                elif(verbose): print("WARNING : Extra anti quark ? ")
 
         #find b quark from top
-        #if(abs(genPart.pdgId) == B_ID): print("b mother:", GenPartsColl[m].pdgId)
-        if(abs(genPart.pdgId) == B_ID and GenPartsColl[m] is close_top):
-            if(b_quark is None): b_quark = genPart
-            else: print("WARNING : Extra quark ? ")
+        top_mother_match = (GenPartsColl[m] is close_top)
+        anti_top_mother_match = (GenPartsColl[m] is other_top)
+        if(abs(genPart.pdgId) == B_ID and top_mother_match):
+            if(b_quark1 is None): b_quark1 = genPart
+            elif(verbose): print("WARNING : Extra quark ? ")
+
+        elif(abs(genPart.pdgId) == B_ID and anti_top_mother_match):
+            if(b_quark2 is None): b_quark2 = genPart
+            elif(verbose): print("WARNING : Extra quark ? ")
 
 
 
-    return top, anti_top, W, anti_W, fermion, anti_fermion, b_quark
+    return top, anti_top, W, anti_W, fermion1, anti_fermion1, b_quark1, fermion2, anti_fermion2, b_quark2
 
 def check_matching(jet, f1, f2, b_quark):
     #check if quarks are inside ak8 jet

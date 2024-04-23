@@ -44,7 +44,7 @@ class Outputer_TTbar(Outputer):
     def reset(self):
         self.idx = 0
         self.jet1_PFCands = np.zeros((self.batch_size, self.n_pf_cands,6), dtype=np.float16)
-        self.jet1_extraInfo = np.zeros((self.batch_size, 10), dtype=np.float32)
+        self.jet1_extraInfo = np.zeros((self.batch_size, 11), dtype=np.float32)
         self.jet_kinematics = np.zeros((self.batch_size, 4), dtype=np.float32)
         self.btag_jet_info = np.zeros((self.batch_size, 5), dtype=np.float32)
         self.mu_info = np.zeros((self.batch_size, 4), dtype=np.float32)
@@ -278,7 +278,8 @@ class Outputer_TTbar(Outputer):
         if(jet1.subJetIdx2 >= 0):
             jet1_btag = max(jet1_btag, subjets[jet1.subJetIdx2].btagDeepB)
 
-        jet1_extraInfo = [jet1.tau1, jet1.tau2, jet1.tau3, jet1.tau4, jet1.lsf3, jet1_btag, jet1.nPFConstituents, jet1.deepTagMD_H4qvsQCD, jet1.deepTagMD_WvsQCD, jet1.deepTag_WvsQCD]
+        jet1_extraInfo = [jet1.tau1, jet1.tau2, jet1.tau3, jet1.tau4, jet1.lsf3, jet1_btag, jet1.nPFConstituents, jet1.deepTagMD_H4qvsQCD, jet1.deepTagMD_WvsQCD, jet1.deepTag_WvsQCD, 
+                jet1.particleNet_WvsQCD]
 
         j1_nPF = min(self.n_pf_cands, jet1.nPFConstituents)
         range1 = PFCandsIdxs[jet1.pf_cands_start : jet1.pf_cands_start + j1_nPF] # indices of pf cands
@@ -291,7 +292,6 @@ class Outputer_TTbar(Outputer):
             jet1_PFCands.append([cand.Px(), cand.Py(), cand.Pz(), cand.E(), PFCands[idx].puppiWeight, PFCands[idx].charge])
 
 
-        #SV's
 
         self.event_info[self.idx] = np.array(event_info, dtype=np.float32)
         self.jet_kinematics[self.idx] = np.array(jet_kinematics, dtype = np.float32)
@@ -339,10 +339,10 @@ class Outputer_TTbar(Outputer):
                 utils.append_h5(f,'truth_label',truth_label_write)
                 utils.append_h5(f,'event_info',self.event_info)
                 utils.append_h5(f,'jet_kinematics',self.jet_kinematics)
-                utils.append_h5(f,'jet1_extraInfo',self.jet1_extraInfo)
-                utils.append_h5(f,'jet1_PFCands',self.jet1_PFCands)
                 utils.append_h5(f, 'btag_jet_info', self.btag_jet_info)
                 utils.append_h5(f, 'mu_info', self.mu_info)
+                utils.append_h5(f,'jet1_extraInfo',self.jet1_extraInfo)
+                utils.append_h5(f,'jet1_PFCands',self.jet1_PFCands)
                 if(self.include_systematics):
                     utils.append_h5(f,'sys_weights',self.sys_weights)
                     utils.append_h5(f,'jet1_JME_vars',self.jet1_JME_vars)
@@ -545,9 +545,6 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
             # Grab the event
             event = Event(inTree, entry)
 
-
-
-            
             passTrigger = False
             passFilter = True
             for fil in filters:
@@ -634,7 +631,8 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
 
 
             #cut on MET and muons
-            if((nMu > 1) or (MET < 50.) or (MET + sel_mu.pt < 100.) or nPVs < 1): continue
+            #if((nMu > 1) or (MET < 50.) or (MET + sel_mu.pt < 100.) or nPVs < 1): continue
+            if((nMu > 1) or (MET < 50.) or (W_cand_pt < 100.) or nPVs < 1): continue
 
             ang_cut = 2.
             min_jet_dR = 99999.
@@ -645,7 +643,6 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
                 #jetId : bit1 = loose, bit2 = tight, bit3 = tightLepVeto. Bit order flipped for 2016UL... Anything > 1 means passes loose
                 #if(jet.jetId & 2 == 2 and jet.pt > ak4_min_pt and abs(jet.eta) < 2.4):
                 if(jet.pt > ak4_min_pt and abs(jet.eta) < 2.4):
-                    jet_dR = deltaR(jet, sel_mu)
                     nAK4s +=1
                     #tightId and loose Pileup ID
                     if (jet.jetId & 2 == 2 and (jet.pt > 50 or jet.puId > 1) and (abs(ang_dist(sel_mu.phi, jet.phi))  < ang_cut) and jet.btagDeepFlavB > btag_cut):
