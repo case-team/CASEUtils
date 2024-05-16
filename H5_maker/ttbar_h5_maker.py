@@ -22,7 +22,7 @@ def rel_pt(mu, jet):
 
 class Outputer_TTbar(Outputer):
     def __init__(self, outputFileName="out.root", batch_size = 5000, truth_label = 0, sample_type="MC", 
-            sort_pfcands = False, include_systematics = True, do_top_ptrw = False, year = "2018"):
+            sort_pfcands = False, include_systematics = True, do_top_ptrw = False, year = "2018", herwig = False, tW = False):
 
         self.batch_size = batch_size
         self.output_name = outputFileName
@@ -38,13 +38,15 @@ class Outputer_TTbar(Outputer):
         self.sort_pfcands = sort_pfcands
         self.year = year
         self.bjet_corr = correctionlib.CorrectionSet.from_file(get_pog_json("btag", self.year))
+        self.herwig = herwig
+        self.tW = tW
 
         self.reset()
 
     def reset(self):
         self.idx = 0
         self.jet1_PFCands = np.zeros((self.batch_size, self.n_pf_cands,6), dtype=np.float16)
-        self.jet1_extraInfo = np.zeros((self.batch_size, 11), dtype=np.float32)
+        self.jet1_extraInfo = np.zeros((self.batch_size, 12), dtype=np.float32)
         self.jet_kinematics = np.zeros((self.batch_size, 4), dtype=np.float32)
         self.btag_jet_info = np.zeros((self.batch_size, 5), dtype=np.float32)
         self.mu_info = np.zeros((self.batch_size, 4), dtype=np.float32)
@@ -92,6 +94,56 @@ class Outputer_TTbar(Outputer):
         jet1_JME_vars = []
 
         gen_parts = np.zeros(self.gen_parts.shape[1], dtype = np.float32)
+
+        top_ptrw_nom = top_ptrw_up = top_ptrw_down = 1.0
+
+        if(self.do_top_ptrw):
+            
+            #save gen particles
+            top, anti_top, W, anti_W, fermion, anti_fermion, b_quark, fermion2, anti_fermion2, b_quark2 = get_ttbar_gen_parts(event, jet1, herwig = self.herwig)
+            if(not self.herwig): top_ptrw_nom, top_ptrw_up, top_ptrw_down = get_top_ptrw(event, top, anti_top)
+
+            match = check_matching(jet1, fermion, anti_fermion, b_quark)
+            #print(top, anti_top, W, anti_W, fermion, anti_fermion, b_quark)
+
+            if(top is None or anti_top is None):
+                gen_parts = [0.]*self.gen_parts.shape[-1]
+
+            else:
+
+                gen_parts = [match, top.pt, top.eta, top.phi, top.mass, 
+                             anti_top.pt, anti_top.eta, anti_top.phi, anti_top.mass, 
+                             W.pt, W.eta, W.phi, W.mass, 
+                             anti_W.pt, anti_W.eta, anti_W.phi, anti_W.mass]
+
+                #add quarks and b if they were found
+                if(fermion is not None and anti_fermion is not None):
+                    gen_parts += [fermion.pt, fermion.eta, fermion.phi, fermion.pdgId, anti_fermion.pt, anti_fermion.eta, anti_fermion.phi, anti_fermion.pdgId] 
+                else: gen_parts += [0.]*8
+                if(b_quark is not None): gen_parts += [b_quark.pt, b_quark.eta, b_quark.phi]
+                else: gen_parts += [0.]*3
+
+
+
+            gen_parts = np.array(gen_parts, dtype = np.float32)
+
+
+        if(self.tW):
+            W, top, fermion, anti_fermion = get_tW_gen_parts(event, jet1)
+
+            match = check_matching(jet1, fermion, anti_fermion, None)
+
+            gen_parts = [match, top.pt, top.eta, top.phi, top.mass, 
+                                W.pt, W.eta, W.phi, W.mass]
+
+            #dummy's to match ttbar shape
+            gen_parts += [0.]*8
+            if(fermion is not None and anti_fermion is not None):
+                gen_parts += [fermion.pt, fermion.eta, fermion.phi, fermion.pdgId, anti_fermion.pt, anti_fermion.eta, anti_fermion.phi, anti_fermion.pdgId] 
+            else: gen_parts += [0.]*8
+
+            gen_parts += [0.]*3
+        
         if(self.include_systematics):
 
             #JME corrections
@@ -171,12 +223,6 @@ class Outputer_TTbar(Outputer):
                 R_up = scale_weights[6] / self.avg_weights['LHEScaleWeight[6]']
                 RF_up = scale_weights[7] / self.avg_weights['LHEScaleWeight[7]']
 
-
-
-
-
-
-
             #PDF's
             if(not scale_fail): pdf_up, pdf_down = get_pdf_weight(inTree)
             else: pdf_up = pdf_down = 1.0
@@ -198,8 +244,6 @@ class Outputer_TTbar(Outputer):
             #PU ID
             puID_nom, puID_up, puID_down = get_puID_SF(btag_jet, self.year)
 
-
-
             #PS weights
             #Older samples don't have
             nPS = inTree.readBranch("nPSWeight")
@@ -211,42 +255,6 @@ class Outputer_TTbar(Outputer):
                 PS_FSR_up = PS_weights[1] / self.avg_weights['PSWeight[1]']
                 PS_ISR_down = PS_weights[2] / self.avg_weights['PSWeight[2]']
                 PS_FSR_down = PS_weights[3] / self.avg_weights['PSWeight[3]']
-
-
-
-            top_ptrw_nom = top_ptrw_up = top_ptrw_down = 1.0
-            if(self.do_top_ptrw):
-                
-                #save gen particles
-                top, anti_top, W, anti_W, fermion, anti_fermion, b_quark = get_ttbar_gen_parts(event, jet1)
-                top_ptrw_nom, top_ptrw_up, top_ptrw_down = get_top_ptrw(event, top, anti_top)
-
-                match = check_matching(jet1, fermion, anti_fermion, b_quark)
-                #print(top, anti_top, W, anti_W, fermion, anti_fermion, b_quark)
-
-                gen_parts = [match, top.pt, top.eta, top.phi, top.mass, 
-                             anti_top.pt, anti_top.eta, anti_top.phi, anti_top.mass, 
-                             W.pt, W.eta, W.phi, W.mass, 
-                             anti_W.pt, anti_W.eta, anti_W.phi, anti_W.mass]
-
-                #add quarks and b if they were found
-                if(fermion is not None and anti_fermion is not None):
-                    gen_parts += [fermion.pt, fermion.eta, fermion.phi, fermion.pdgId, anti_fermion.pt, anti_fermion.eta, anti_fermion.phi, anti_fermion.pdgId] 
-                else: gen_parts += [0.]*6
-                if(b_quark is not None): gen_parts += [b_quark.pt, b_quark.eta, b_quark.phi]
-                else: gen_parts += [0.]*3
-
-
-
-                gen_parts = np.array(gen_parts, dtype = np.float32)
-
-                #print(gen_parts)
-
-                
-
-
-
-
 
 
             gen_weight = prefire_nom * pileup_nom * btag_nom * top_ptrw_nom * mu_weights["nominal"] *puID_nom * np.sign(genWeight) 
@@ -262,9 +270,6 @@ class Outputer_TTbar(Outputer):
 
             self.jet1_JME_vars[self.idx] = jet1.JME_vars
 
-
-            
-
         jet_kinematics = [jet1.pt_corr, jet1.eta, jet1.phi, jet1.msoftdrop_corr]
         btag_jet_info = [btag_jet.pt, btag_jet.eta, btag_jet.phi, btag_jet.mass, btag_jet.btagDeepB]
         mu_info = [sel_mu.pt, sel_mu.eta, sel_mu.phi, sel_mu.charge]
@@ -279,7 +284,7 @@ class Outputer_TTbar(Outputer):
             jet1_btag = max(jet1_btag, subjets[jet1.subJetIdx2].btagDeepB)
 
         jet1_extraInfo = [jet1.tau1, jet1.tau2, jet1.tau3, jet1.tau4, jet1.lsf3, jet1_btag, jet1.nPFConstituents, jet1.deepTagMD_H4qvsQCD, jet1.deepTagMD_WvsQCD, jet1.deepTag_WvsQCD, 
-                jet1.particleNet_WvsQCD]
+                jet1.particleNet_WvsQCD, jet1.particleNet_H4qvsQCD]
 
         j1_nPF = min(self.n_pf_cands, jet1.nPFConstituents)
         range1 = PFCandsIdxs[jet1.pf_cands_start : jet1.pf_cands_start + j1_nPF] # indices of pf cands
@@ -328,11 +333,11 @@ class Outputer_TTbar(Outputer):
                 f.create_dataset("mu_info", data=self.mu_info, chunks = True, maxshape=(None, self.mu_info.shape[1]))
                 f.create_dataset("jet1_extraInfo", data=self.jet1_extraInfo, chunks = True, maxshape=(None, self.jet1_extraInfo.shape[1]))
                 f.create_dataset("jet1_PFCands", data=self.jet1_PFCands, chunks = True, maxshape=(None, self.jet1_PFCands.shape[1], self.jet1_PFCands.shape[2]), compression='gzip')
+                if(self.do_top_ptrw):
+                    f.create_dataset("gen_parts", data=self.gen_parts, chunks = True, maxshape=(None, self.gen_parts.shape[1]), compression='gzip')
                 if(self.include_systematics):
                     f.create_dataset("sys_weights", data=self.sys_weights, chunks = True, maxshape=(None, self.sys_weights.shape[1]))
                     f.create_dataset("jet1_JME_vars", data=self.jet1_JME_vars, chunks = True, maxshape=(None, self.jet1_JME_vars.shape[1]))
-                    if(self.do_top_ptrw):
-                        f.create_dataset("gen_parts", data=self.gen_parts, chunks = True, maxshape=(None, self.gen_parts.shape[1]), compression='gzip')
 
         else:
             with h5py.File(self.output_name, "a") as f:
@@ -343,11 +348,10 @@ class Outputer_TTbar(Outputer):
                 utils.append_h5(f, 'mu_info', self.mu_info)
                 utils.append_h5(f,'jet1_extraInfo',self.jet1_extraInfo)
                 utils.append_h5(f,'jet1_PFCands',self.jet1_PFCands)
+                if(self.do_top_ptrw): utils.append_h5(f, 'gen_parts', self.gen_parts)
                 if(self.include_systematics):
                     utils.append_h5(f,'sys_weights',self.sys_weights)
                     utils.append_h5(f,'jet1_JME_vars',self.jet1_JME_vars)
-                    if(self.do_top_ptrw):
-                        utils.append_h5(f, 'gen_parts', self.gen_parts)
 
         self.reset()
 
@@ -360,10 +364,10 @@ class Outputer_TTbar(Outputer):
             self.btag_jet_info = self.btag_jet_info[:self.idx]
             self.mu_info = self.mu_info[:self.idx]
             self.event_info = self.event_info[:self.idx]
+            if(self.do_top_ptrw): self.gen_parts = self.gen_parts[:self.idx]
             if(self.include_systematics):
                 self.sys_weights = self.sys_weights[:self.idx]
                 self.jet1_JME_vars = self.jet1_JME_vars[:self.idx]
-                self.gen_parts = self.gen_parts[:self.idx]
 
         self.write_out()
         self.preselection_eff = eff
@@ -419,7 +423,7 @@ class Outputer_TTbar(Outputer):
 
 
 def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="out.root", json = '', year = "2018", nEventsMax = -1, sampleType = "MC", 
-        sort_pfcands=True,  include_systematics = False, do_top_ptrw = False):
+        sort_pfcands=True,  include_systematics = False, do_top_ptrw = False, herwig = False, tW = False):
     
     if not ((sampleType == "MC") or (sampleType=="data")):
         print("Error! sampleType needs to be set to either data or MC! Please set correct option and retry.")
@@ -465,7 +469,7 @@ def NanoReader_TTbar(process_flag, inputFileNames=["in.root"], outputFileName="o
     n_JES_up = n_JES_down = n_JER_up = n_JER_down = 0
 
     out = Outputer_TTbar(outputFileName, truth_label =  process_flag, sample_type=sampleType, sort_pfcands=sort_pfcands, 
-            include_systematics = include_systematics, year = year, do_top_ptrw = do_top_ptrw)
+            include_systematics = include_systematics, year = year, do_top_ptrw = do_top_ptrw, herwig = herwig, tW = tW)
 
 
 

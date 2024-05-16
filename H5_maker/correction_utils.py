@@ -154,7 +154,8 @@ def get_lepton_weights(lepton, year, lepton_type="muon"):
     ul_year = get_UL_year(year)
     if lepton_type == "electron":
         ul_year = ul_year.replace('_UL', '')
-    cset = correctionlib.CorrectionSet.from_file(get_pog_json(lepton_type, year))
+    json_name = get_pog_json(lepton_type, year)
+    cset = correctionlib.CorrectionSet.from_file(json_name)
 
     def set_isothreshold(corr, value, lepton_pt, lepton_type):
         iso_threshold = {
@@ -200,12 +201,12 @@ def get_lepton_weights(lepton, year, lepton_type="muon"):
 
         lepton_pt,lepton_eta = get_clip(lep_pt, lep_eta, lepton_type, corr)
 
-        nom = cset[json_map_name].evaluate(ul_year, lepton_eta, lepton_pt, "sf")
+        nom = cset[json_map_name].evaluate(lepton_eta, lepton_pt, "nominal")
         values["nominal"] *= nom
 
 
-        values[corr + "_up"] = cset[json_map_name].evaluate(ul_year, lepton_eta, lepton_pt, "systup") / nom
-        values[corr + "_down"] = cset[json_map_name].evaluate(ul_year, lepton_eta, lepton_pt, "systdown") / nom
+        values[corr + "_up"] = cset[json_map_name].evaluate(lepton_eta, lepton_pt, "systup") / nom
+        values[corr + "_down"] = cset[json_map_name].evaluate(lepton_eta, lepton_pt, "systdown") / nom
 
         #for key, val in values.items():
             ## restrict values to 1 for some SFs if we are above/below the ISO threshold 
@@ -249,6 +250,14 @@ def isFinal(genPart):
     mask = 1 << 13 #13th bit of status flag 
     return (genPart.statusFlags & mask) != 0
 
+def isFirstCopy(statusFlag):
+    mask = 1 << 12
+    return (statusFlag & mask) != 0
+
+def fromHardProcess(statusFlag):
+    mask = 1 << 8
+    return (statusFlag & mask) != 0
+
 
 def get_top_ptrw(event, top = None, anti_top = None):
 
@@ -284,8 +293,8 @@ def get_top_ptrw(event, top = None, anti_top = None):
     up_norm_factor = 1.0
     down_norm_factor = 1.0
 
-    nom1 = A * np.exp(-B * top_pt) - C * top_pt + D
-    nom2 = A * np.exp(-B * anti_top_pt) - C * anti_top_pt + D
+    nom1 = A * np.exp(-B * top.pt) - C * top.pt + D
+    nom2 = A * np.exp(-B * anti_top.pt) - C * anti_top.pt + D
 
     nom = (nom1 * nom2)**(0.5)
     print('top pt rw', nom)
@@ -304,6 +313,167 @@ def get_parent_top(coll, p):
     mother = coll[p.genPartIdxMother]
     if(abs(mother.pdgId) == top_ID): return p.genPartIdxMother
     return get_parent_top(coll, mother)
+
+def findMother_pythia(coll, part, mother_ids, dist = 0):
+    if((part.pdgId in mother_ids) and isFirstCopy(part.statusFlags)): return part, dist
+    if(part.genPartIdxMother < 0): return None, -1
+    if(part.genPartIdxMother == 0): return None, dist
+    else:
+        mother =  coll[part.genPartIdxMother]
+        #if(abs(mother.pdgId) in mother_ids and isFirstCopy(mother.statusFlags)): return mother, dist+1
+        return findMother_pythia(coll, mother, mother_ids, dist+1)
+
+def findMother(coll, part, mother_ids, dist = 0):
+    if(part.genPartIdxMother < 0): return None, -1
+    if(part.genPartIdxMother == 0): return None, dist
+    mother =  coll[part.genPartIdxMother]
+    if(abs(mother.pdgId) in mother_ids): return mother, dist+1
+    return findMother(coll, mother, mother_ids, dist+1)
+
+def get_YtoHH_gen_parts(event, verbose = False, herwig = False):
+    if(herwig): return get_YtoHH_gen_parts_herwig(event, verbose)
+    else:  return get_YtoHH_gen_parts_pythia(event, verbose)
+
+
+def get_YtoHH_gen_parts_pythia(event, verbose = False):
+    GenPartsColl = Collection(event, "GenPart")
+
+    #Y -> HH, H-> tt
+    H1 = H2 = None
+    H_ID = 25
+    Y_ID = 39
+    q1s = []
+    q2s = []
+
+    for i, gen_part in enumerate(GenPartsColl):
+        #print(i, gen_part.pdgId, gen_part.genPartIdxMother, gen_part.pt, gen_part.eta, gen_part.phi, gen_part.mass)
+        if(isFirstCopy(gen_part.statusFlags) and fromHardProcess(gen_part.statusFlags)):
+        #if(isFirstCopy(gen_part.statusFlags) and gen_part.genPartIdxMother > 0  and abs(GenPartsColl[gen_part.genPartIdxMother].pdgId) in parent_ids):
+            if(abs(gen_part.pdgId) == H_ID):
+                if(H1 is None): H1 = gen_part
+                elif(H2 is None): H2 = gen_part
+                else: print("Extra H!")
+                #print("Z", gen_part.pt, gen_part.eta, gen_part.phi, gen_part.pdgId, gen_part.genPartIdxMother)
+
+
+    parent_ids = {top_ID, W_ID}
+
+    #avoid low pt garbage from shower
+
+    for gen_part in GenPartsColl:
+        if(abs(gen_part.pdgId) <= MAXLEP_ID and isFirstCopy(gen_part.statusFlags) and gen_part.genPartIdxMother > 0 and fromHardProcess(gen_part.statusFlags)
+                and abs(GenPartsColl[gen_part.genPartIdxMother].pdgId) in parent_ids):
+
+            H_cand, H_dist = findMother_pythia(GenPartsColl, gen_part, {H_ID, Y_ID}, dist=0)
+            if(H1 is not None and H2 is not None):
+                if(H_cand is H1 ): q1s.append((H_dist, gen_part))
+                elif(H_cand is H2 ): q2s.append((H_dist, gen_part))
+            else:
+                #No H candidates saved, just do the best we can to split the partons between the two H candidates
+                #b quarks usually come first, 2 per H cand
+                if(abs(gen_part.pdgId) == B_ID and  abs(GenPartsColl[gen_part.genPartIdxMother].pdgId) == top_ID and len(q1s) < 2): q1s.append((len(q1s), gen_part))
+                elif(abs(gen_part.pdgId) == B_ID and  abs(GenPartsColl[gen_part.genPartIdxMother].pdgId) == top_ID): q2s.append((len(q2s), gen_part))
+                elif(abs(GenPartsColl[gen_part.genPartIdxMother].pdgId) == W_ID and len(q1s) < 6): q1s.append((len(q1s), gen_part))
+                elif(abs(GenPartsColl[gen_part.genPartIdxMother].pdgId) == W_ID): q2s.append((len(q2s), gen_part))
+
+
+
+    #gen matching isn't always perfect, do some attempt at cleanup here
+    if(len(q1s) != 6 or len(q2s) != 6):
+        print("Issue in quark finding!")
+        print(len(q1s), len(q2s))
+        print(q1s)
+        print(q2s)
+        print(H1, H2)
+        for i, gen_part in enumerate(GenPartsColl):
+            print(i, gen_part.pdgId, gen_part.genPartIdxMother, gen_part.pt, gen_part.eta, gen_part.phi, gen_part.mass, 
+                    isFirstCopy(gen_part.statusFlags), fromHardProcess(gen_part.statusFlags), findMother_pythia(GenPartsColl, gen_part, {H_ID, Y_ID}, dist = 0))
+        exit(1)
+
+    if(len(q1s) > 6): q1s = prune_genparts(q1s, 6)
+    if(len(q2s) > 6): q2s = prune_genparts(q2s, 6)
+    q1_vecs =  [ [gen_part.pt, gen_part.eta, gen_part.phi, gen_part.pdgId] for dist,gen_part in q1s ]
+    q2_vecs =  [ [gen_part.pt, gen_part.eta, gen_part.phi, gen_part.pdgId] for dist,gen_part in q2s ]
+
+    #zero pad if we missed some quarks
+    while(len(q1_vecs) < 6): q1_vecs.append([-1.0, 0.0, 0.0, 0])
+    while(len(q2_vecs) < 6): q2_vecs.append([-1.0, 0.0, 0.0, 0])
+
+    return H1, H2, q1_vecs + q2_vecs
+
+
+def get_YtoHH_gen_parts_herwig(event, verbose = False):
+    GenPartsColl = Collection(event, "GenPart")
+
+    #Y -> HH, H-> tt
+    H1 = H2 = t1a = t1b = t2a = t2b = None
+    H_ID = 25
+    Y_ID = 39
+    q1s = []
+    q2s = []
+
+    for i, gen_part in enumerate(GenPartsColl):
+        #print(i, gen_part.pdgId, gen_part.genPartIdxMother, gen_part.pt, gen_part.eta, gen_part.phi, gen_part.mass)
+        m = GenPartsColl[gen_part.genPartIdxMother] if gen_part.genPartIdxMother >= 0 else gen_part
+        if(abs(gen_part.pdgId) == H_ID and abs(m.pdgId) == Y_ID):
+            if(H1 is None): H1 = gen_part
+            elif(H2 is None): H2 = gen_part
+            else: print("Extra H!")
+
+    #for i, gen_part in enumerate(GenPartsColl):
+    #    if(abs(gen_part.pdgId) == TOP_ID and (m is H1 or m is H2)):
+    #        if(m is H1):
+    #            if(t1a is None): t1a = gen_part
+    #            elif(t1b is None): t1b = gen_part
+    #        if(m is H2):
+    #            if(t1a is None): t2a = gen_part
+    #            elif(t1b is None): t2a = gen_part
+
+                #print("Z", gen_part.pt, gen_part.eta, gen_part.phi, gen_part.pdgId, gen_part.genPartIdxMother)
+
+
+    parent_ids = {top_ID, W_ID}
+
+    #avoid low pt garbage from shower
+
+    for gen_part in GenPartsColl:
+        m = GenPartsColl[gen_part.genPartIdxMother] if gen_part.genPartIdxMother >= 0 else gen_part
+        if(abs(gen_part.pdgId) <= MAXLEP_ID and (abs(gen_part.pdgId) != top_ID) and abs(m.pdgId) in parent_ids):
+
+            H_cand, H_dist = findMother(GenPartsColl, gen_part, {H_ID, Y_ID}, dist=0)
+            if(H1 is not None and H2 is not None):
+                if(H_cand is H1 ): q1s.append(gen_part)
+                elif(H_cand is H2 ): q2s.append(gen_part)
+            else:
+                #No H candidates saved, just do the best we can to split the partons between the two H candidates
+                #b quarks usually come first, 2 per H cand
+                if(abs(gen_part.pdgId) == B_ID and  abs(GenPartsColl[gen_part.genPartIdxMother].pdgId) == top_ID and len(q1s) < 2): q1s.append(gen_part)
+                elif(abs(gen_part.pdgId) == B_ID and  abs(GenPartsColl[gen_part.genPartIdxMother].pdgId) == top_ID): q2s.append(gen_part)
+                elif(abs(GenPartsColl[gen_part.genPartIdxMother].pdgId) == W_ID and len(q1s) < 6): q1s.append(gen_part)
+                elif(abs(GenPartsColl[gen_part.genPartIdxMother].pdgId) == W_ID): q2s.append(gen_part)
+
+
+    #gen matching isn't always perfect, do some attempt at cleanup here
+    if(len(q1s) != 6 or len(q2s) != 6):
+        if(verbose):
+            print("Issue in quark finding!")
+            print(len(q1s), len(q2s))
+            print(q1s)
+            print(q2s)
+            for i, gen_part in enumerate(GenPartsColl):
+                print(i, gen_part.pdgId, gen_part.genPartIdxMother, gen_part.pt, gen_part.eta, gen_part.phi, gen_part.mass)
+            #exit(1)
+
+    #if(len(q1s) > 6): q1s = prune_genparts(q1s, 6)
+    #if(len(q2s) > 6): q2s = prune_genparts(q2s, 6)
+    q1_vecs =  [ [gen_part.pt, gen_part.eta, gen_part.phi, gen_part.pdgId] for gen_part in q1s[:6]]
+    q2_vecs =  [ [gen_part.pt, gen_part.eta, gen_part.phi, gen_part.pdgId] for gen_part in q2s[:6]]
+
+    #zero pad if we missed some quarks
+    while(len(q1_vecs) < 6): q1_vecs.append([-1.0, 0.0, 0.0, 0])
+    while(len(q2_vecs) < 6): q2_vecs.append([-1.0, 0.0, 0.0, 0])
+
+    return H1, H2, q1_vecs + q2_vecs
 
 def get_Wkk_gen_parts(event, verbose = False, herwig = False):
     GenPartsColl = Collection(event, "GenPart")
@@ -368,6 +538,56 @@ def get_Wkk_gen_parts(event, verbose = False, herwig = False):
 
 
 
+def get_tW_gen_parts(event, ak8_jet, herwig = False, verbose = True):
+    #herwig doesn't use same status codes 
+
+    GenPartsColl = Collection(event, "GenPart")
+
+    top = W = fermion1 = anti_fermion1  = None
+
+
+    count = 0
+    for genPart in GenPartsColl:
+        #print(count, genPart.pdgId, genPart.pt, genPart.genPartIdxMother)
+        count+=1
+        #tops
+        if(abs(genPart.pdgId) == top_ID and isFinal(genPart)):
+            if(top is None): top = genPart
+            else: print("WARNING : Extra top ? ")
+
+        m = GenPartsColl[genPart.genPartIdxMother]
+        #W's not frop top decay
+        if(abs(genPart.pdgId) == W_ID and isFinal(genPart)  and (get_parent_top(GenPartsColl, genPart) is None) ):
+            if(W is None): W = genPart
+            else: print("WARNING : Extra W ? ")
+
+
+    if(top is None or W is None ):
+        print("Couldnt find top or W: ")
+        print(top, W )
+        count = 0
+        for genPart in GenPartsColl:
+            print(count, genPart.pdgId, genPart.pt, genPart.genPartIdxMother)
+            count+=1
+        return top, W, fermion1, anti_fermion1
+
+    for genPart in GenPartsColl:
+        #quarks or leptons from W decay
+        m = genPart.genPartIdxMother
+        w_mother_match = (GenPartsColl[m] is W)
+        if(abs(genPart.pdgId) <= MAXLEP_ID and m > 0 and w_mother_match):
+            if(genPart.pdgId > 0): 
+                if(fermion1 is None): fermion1 = genPart
+                elif(verbose): print("WARNING : Extra quark ? ")
+            else: 
+                if(anti_fermion1 is None): anti_fermion1 = genPart
+                elif(verbose): print("WARNING : Extra anti quark ? ")
+
+    return top, W, fermion1, anti_fermion1 
+
+
+
+
 def get_ttbar_gen_parts(event, ak8_jet, herwig = False, verbose = True):
     #herwig doesn't use same status codes 
 
@@ -383,7 +603,7 @@ def get_ttbar_gen_parts(event, ak8_jet, herwig = False, verbose = True):
             mother = GenPartsColl[genPart.genPartIdxMother] if genPart.genPartIdxMother >= 0 else genPart
 
             #Find tops that decay to W's
-            if(abs(genPart.pdgId) == W_ID and abs(mother.pdgId) == top_ID and mother.pt > 15.):
+            if(abs(genPart.pdgId) == W_ID and abs(mother.pdgId) == top_ID):
                 if(genPart.pdgId > 0): 
                     if(W is None): 
                         W = genPart
@@ -424,8 +644,8 @@ def get_ttbar_gen_parts(event, ak8_jet, herwig = False, verbose = True):
 
 
     if(top is None or anti_top is None or W is None or anti_W is None):
-        #print("Couldnt find top or W: ")
-        #print(top, anti_top, W, anti_W)
+        print("Couldnt find top or W: ")
+        print(top, anti_top, W, anti_W)
         #count = 0
         #for genPart in GenPartsColl:
         #    print(count, genPart.pdgId, genPart.pt, genPart.genPartIdxMother)

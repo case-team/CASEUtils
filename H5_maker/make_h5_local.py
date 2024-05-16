@@ -11,6 +11,7 @@ parser.add_option("-f", "--flag", dest = "flag", default = -1234, type=int, help
 parser.add_option("--sys", default = False, action = 'store_true', help="Add additional info the h5's for systematics")
 parser.add_option("--top_ptrw", default = False, action = 'store_true', help="Include ttbar top pt reweighting factors")
 parser.add_option("--ttbar", default = False, action = 'store_true', help="Semi leptonic ttbar version of h5 maker (different preselection)")
+parser.add_option("--tW", default = False, action = 'store_true', help="tW sample")
 parser.add_option("--herwig", default = False, action = 'store_true', help="Semi leptonic ttbar version of h5 maker (different preselection)")
 parser.add_option("--gen", default = False, action = 'store_true', help="Gen level ttbar version of h5 maker (different preselection)")
 parser.add_option("--sample_type", default = "MC", help="MC or data")
@@ -47,7 +48,7 @@ elif(options.gen):
         nEventsMax = options.nEvents, include_systematics = options.sys, do_top_ptrw = options.top_ptrw, sampleType = options.sample_type, herwig = options.herwig)
 elif(options.ttbar):
     NanoReader_TTbar(options.flag, inputFileNames = input_files, outputFileName = options.fout, json = options.json, year = options.year, 
-        nEventsMax = options.nEvents, include_systematics = options.sys, do_top_ptrw = options.top_ptrw, sampleType = options.sample_type)
+        nEventsMax = options.nEvents, include_systematics = options.sys, do_top_ptrw = options.top_ptrw, sampleType = options.sample_type, tW = options.tW, herwig = options.herwig)
 else:
 
     NanoReader(options.flag, inputFileNames = input_files, outputFileName = options.fout, json = options.json, year = options.year, 

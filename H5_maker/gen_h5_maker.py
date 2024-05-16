@@ -25,7 +25,7 @@ class Outputer_Gen(Outputer):
         self.truth_label = np.array([[truth_label]]*batch_size, dtype=np.int8)
         self.idx = 0
         self.nBatch = 0
-        self.n_pf_cands = 100 #how many PF candidates to save (max)
+        self.n_pf_cands = 300 #how many PF candidates to save (max)
         self.do_top_ptrw = do_top_ptrw
         self.top_weights = []
         self.sort_pfcands = sort_pfcands
@@ -40,7 +40,8 @@ class Outputer_Gen(Outputer):
         self.jet_kinematics = np.zeros((self.batch_size, 8), dtype=np.float32)
         self.event_info = np.zeros((self.batch_size, 6), dtype=np.float32)
         self.sys_weights = np.zeros((self.batch_size, 29), dtype=np.float32)
-        self.gen_parts = np.zeros((self.batch_size, 8, 4), dtype=np.float32)
+        #self.gen_info = np.zeros((self.batch_size, 14, 4), dtype=np.float32)
+        self.gen_info = np.zeros((self.batch_size, 8, 4), dtype=np.float32)
 
 
     
@@ -64,53 +65,53 @@ class Outputer_Gen(Outputer):
 
         sys_weights = []
 
-        gen_parts = np.zeros(self.gen_parts.shape[1], dtype = np.float32)
+        gen_info = np.zeros(self.gen_info.shape[1], dtype = np.float32)
 
 
         #save gen particles
-        radion, W_ISO, gen_qs = get_Wkk_gen_parts(event, herwig = self.herwig)
+        daughter1, daughter2, gen_qs = get_Wkk_gen_parts(event, herwig = self.herwig)
+        #daughter1, daughter2, gen_qs = get_YtoHH_gen_parts(event, herwig = self.herwig)
 
-        gen_parts = [[radion.pt, radion.eta, radion.phi, radion.mass],
-                    [W_ISO.pt, W_ISO.eta, W_ISO.phi, W_ISO.mass]] + gen_qs
+        gen_info = [[daughter1.pt, daughter1.eta, daughter1.phi, daughter1.mass],
+                    [daughter2.pt, daughter2.eta, daughter2.phi, daughter2.mass]] + gen_qs
 
 
-        gen_parts = np.array(gen_parts, dtype = np.float32)
+        gen_info = np.array(gen_info, dtype = np.float32)
 
 
         jet_kinematics = [jet1.pt, jet1.eta, jet1.phi, jet1.mass, jet2.pt, jet2.eta, jet2.phi, jet2.mass]
         
         j1_nPF = min(self.n_pf_cands, jet1.nConstituents)
-        range1 = PFCandsIdxs[jet1.pf_cands_start : jet1.pf_cands_start + j1_nPF] # indices of pf cands
         j2_nPF = min(self.n_pf_cands, jet2.nConstituents)
-        range2 = PFCandsIdxs[jet2.pf_cands_start : jet2.pf_cands_start + j2_nPF] # indices of pf cands
+        range1 = PFCandsIdxs[jet1.pf_cands_start : jet1.pf_cands_start + jet1.nConstituents] # indices of pf cands
+        range2 = PFCandsIdxs[jet2.pf_cands_start : jet2.pf_cands_start + jet2.nConstituents] # indices of pf cands
 
         jet2_PFCands = []
         jet1_PFCands = []
 
         for i,conv in enumerate(range1):
             idx = conv.pFCandsIdx
-            if(i > j1_nPF): break
             cand = ROOT.Math.PtEtaPhiMVector(PFCands[idx].pt, PFCands[idx].eta, PFCands[idx].phi, PFCands[idx].mass)
             jet1_PFCands.append([cand.Px(), cand.Py(), cand.Pz(), cand.E(), 1, 1])
 
         for i,conv in enumerate(range2):
             idx = conv.pFCandsIdx
-            if(i > j2_nPF): break
             cand = ROOT.Math.PtEtaPhiMVector(PFCands[idx].pt, PFCands[idx].eta, PFCands[idx].phi, PFCands[idx].mass)
             jet2_PFCands.append([cand.Px(), cand.Py(), cand.Pz(), cand.E(), 1, 1])
 
 
         self.event_info[self.idx] = np.array(event_info, dtype=np.float32)
         self.jet_kinematics[self.idx] = np.array(jet_kinematics, dtype = np.float32)
-        self.gen_parts[self.idx] = gen_parts
+        self.gen_info[self.idx] = gen_info
+
         
         # sort PFCands by pt
         if self.sort_pfcands:
-            self.jet1_PFCands[self.idx,:jet1.nConstituents] = self.get_pfcands_sorted(np.array(jet1_PFCands, dtype = np.float32))
-            self.jet2_PFCands[self.idx,:jet2.nConstituents] = self.get_pfcands_sorted(np.array(jet2_PFCands, dtype = np.float32))
+            self.jet1_PFCands[self.idx,:j1_nPF] = self.get_pfcands_sorted(np.array(jet1_PFCands, dtype = np.float32))[:j1_nPF]
+            self.jet2_PFCands[self.idx,:j2_nPF] = self.get_pfcands_sorted(np.array(jet2_PFCands, dtype = np.float32))[:j2_nPF]
         else:
-            self.jet1_PFCands[self.idx,:jet1.nConstituents] = np.array(jet1_PFCands, dtype = np.float32)
-            self.jet2_PFCands[self.idx,:jet2.nConstituents] = np.array(jet2_PFCands, dtype = np.float32)
+            self.jet1_PFCands[self.idx,:j1_nPF] = np.array(jet1_PFCands, dtype = np.float32)[:j1_nPF]
+            self.jet2_PFCands[self.idx,:j2_nPF] = np.array(jet2_PFCands, dtype = np.float32)[:j2_nPF]
 
         nPS = inTree.readBranch("nPSWeight")
         if(nPS > 1):
@@ -143,7 +144,7 @@ class Outputer_Gen(Outputer):
                 f.create_dataset("jet1_PFCands", data=self.jet1_PFCands, chunks = True, maxshape=(None, self.jet1_PFCands.shape[1], self.jet1_PFCands.shape[2]), compression='gzip')
                 f.create_dataset("jet2_PFCands", data=self.jet2_PFCands, chunks = True, maxshape=(None, self.jet2_PFCands.shape[1], self.jet2_PFCands.shape[2]), compression='gzip')
                 f.create_dataset("sys_weights", data=self.sys_weights, chunks = True, maxshape=(None, self.sys_weights.shape[1]))
-                f.create_dataset("gen_parts", data=self.gen_parts, chunks = True, maxshape=(None, self.gen_parts.shape[1], 4), compression='gzip')
+                f.create_dataset("gen_info", data=self.gen_info, chunks = True, maxshape=(None, self.gen_info.shape[1], 4), compression='gzip')
 
         else:
             with h5py.File(self.output_name, "a") as f:
@@ -153,7 +154,7 @@ class Outputer_Gen(Outputer):
                 utils.append_h5(f,'jet1_PFCands',self.jet1_PFCands)
                 utils.append_h5(f,'jet2_PFCands',self.jet2_PFCands)
                 utils.append_h5(f,'sys_weights',self.sys_weights)
-                utils.append_h5(f, 'gen_parts', self.gen_parts)
+                utils.append_h5(f, 'gen_info', self.gen_info)
 
         self.reset()
 
@@ -165,7 +166,7 @@ class Outputer_Gen(Outputer):
             self.jet_kinematics = self.jet_kinematics[:self.idx] 
             self.event_info = self.event_info[:self.idx]
             self.sys_weights = self.sys_weights[:self.idx]
-            self.gen_parts = self.gen_parts[:self.idx]
+            self.gen_info = self.gen_info[:self.idx]
 
         self.write_out()
         self.preselection_eff = eff
@@ -244,12 +245,12 @@ def NanoReader_Gen(process_flag, inputFileNames=["in.root"], outputFileName="out
             
             AK8Jets = Collection(event, "GenJetAK8")
             AK4Jets = Collection(event, "GenJet")
-            gen_parts = Collection(event, "GenPart")
             Mus = Collection(event, "Muon")
 
 
             #Swap to YtoHH too
             daughter1, daughter2, _ = get_Wkk_gen_parts(event, verbose = False, herwig = herwig)
+            #daughter1, daughter2, _ = get_YtoHH_gen_parts(event, verbose = False, herwig = herwig)
 
 
             if(daughter1 is None or daughter2 is None): continue
