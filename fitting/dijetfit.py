@@ -415,6 +415,8 @@ def dijetfit(options):
         card.addSignalShape('model_signal_mjj', 'mjj', sig_file_name,
                             {'CMS_scale_j': 1.0}, {'CMS_res_j': 1.0})
 
+    if(options.sig_norm_unc > 0):
+        card.addSystematic("SigEff", "lnN", values = {"model_signal_mjj" : 1. + options.sig_norm_unc})
 
 
     sig_norm = card.addFixedYieldFromFile('model_signal_mjj', 0, sig_file_name,
@@ -433,8 +435,6 @@ def dijetfit(options):
     card.importBinnedData("sb_fit.root", sig_data_name,
                           ["mjj"], 'data_obs', 1.0)
 
-    if(options.sig_norm_unc > 0):
-        card.addSystematic("SigEff", "lnN", values = {"model_signal_mjj" : 1. + options.sig_norm_unc})
     card.makeCard()
     card.delete()
 
@@ -443,14 +443,14 @@ def dijetfit(options):
     cmd = (
         "text2workspace.py datacard_JJ_{l2}.txt "
         + "-o workspace_JJ_{l1}_{l2}.root "
-        + "&& combine -M FitDiagnostics workspace_JJ_{l1}_{l2}.root --cminPreFit 1 "
-        + "-m {mass} -n _{l1}_{l2} --robustFit 1"
-        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root --usePLC "
+        + "&& combine -M FitDiagnostics workspace_JJ_{l1}_{l2}.root --cminPreFit 1 --setParameterRanges r=-1000.0,1000.0 "
+        + "-m {mass} -n _{l1}_{l2} --robustFit 1  "
+        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root --usePLC --setParameterRanges r=-1000.0,1000.0 "
         + "-m {mass} -n significance_{l1}_{l2} "
-        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root --usePLC "
+        + "&& combine -M Significance workspace_JJ_{l1}_{l2}.root --usePLC --setParameterRanges r=-1000.0,1000.0 "
         + "-m {mass} --pvalue -n pvalue_{l1}_{l2} "
-        + "&& combine -M AsymptoticLimits workspace_JJ_{l1}_{l2}.root "
-        + "-m {mass} -n lim_{l1}_{l2} "
+        + "&& combine -M AsymptoticLimits workspace_JJ_{l1}_{l2}.root --setParameterRanges r=-1000.0,1000.0 "
+        + "-m {mass} -n lim_{l1}_{l2}"
         ).format(mass=mass, l1=label, l2=sb_label)
     print(cmd)
     os.system(cmd)
@@ -496,7 +496,7 @@ def dijetfit(options):
     true_sig_strength = get_sig_in_window(options.inputFile, binsx[0], binsx[-1]) /  sig_norm
     print("True sig strength %.3f" % true_sig_strength)
 
-    cmd = ("combine -M Significance workspace_JJ_{l1}_{l2}.root -t -1 --expectSignal %.3f --toysFreq " % (true_sig_strength)
+    cmd = ("combine -M Significance workspace_JJ_{l1}_{l2}.root -t -1 --expectSignal %.3f --toysFreq --setParameterRanges r=-1000.0,1000.0 " % (true_sig_strength)
         + "-m {mass} -n _exp_significance_{l1}_{l2} ").format(mass = mass, l1 = label, l2 = sb_label)
     print(cmd)
     os.system(cmd)
