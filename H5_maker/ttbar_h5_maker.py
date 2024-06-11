@@ -333,7 +333,7 @@ class Outputer_TTbar(Outputer):
                 f.create_dataset("mu_info", data=self.mu_info, chunks = True, maxshape=(None, self.mu_info.shape[1]))
                 f.create_dataset("jet1_extraInfo", data=self.jet1_extraInfo, chunks = True, maxshape=(None, self.jet1_extraInfo.shape[1]))
                 f.create_dataset("jet1_PFCands", data=self.jet1_PFCands, chunks = True, maxshape=(None, self.jet1_PFCands.shape[1], self.jet1_PFCands.shape[2]), compression='gzip')
-                if(self.do_top_ptrw):
+                if(self.do_top_ptrw or self.tW):
                     f.create_dataset("gen_parts", data=self.gen_parts, chunks = True, maxshape=(None, self.gen_parts.shape[1]), compression='gzip')
                 if(self.include_systematics):
                     f.create_dataset("sys_weights", data=self.sys_weights, chunks = True, maxshape=(None, self.sys_weights.shape[1]))
@@ -348,7 +348,7 @@ class Outputer_TTbar(Outputer):
                 utils.append_h5(f, 'mu_info', self.mu_info)
                 utils.append_h5(f,'jet1_extraInfo',self.jet1_extraInfo)
                 utils.append_h5(f,'jet1_PFCands',self.jet1_PFCands)
-                if(self.do_top_ptrw): utils.append_h5(f, 'gen_parts', self.gen_parts)
+                if(self.do_top_ptrw or self.tW): utils.append_h5(f, 'gen_parts', self.gen_parts)
                 if(self.include_systematics):
                     utils.append_h5(f,'sys_weights',self.sys_weights)
                     utils.append_h5(f,'jet1_JME_vars',self.jet1_JME_vars)
@@ -364,7 +364,7 @@ class Outputer_TTbar(Outputer):
             self.btag_jet_info = self.btag_jet_info[:self.idx]
             self.mu_info = self.mu_info[:self.idx]
             self.event_info = self.event_info[:self.idx]
-            if(self.do_top_ptrw): self.gen_parts = self.gen_parts[:self.idx]
+            if(self.do_top_ptrw or self.tW): self.gen_parts = self.gen_parts[:self.idx]
             if(self.include_systematics):
                 self.sys_weights = self.sys_weights[:self.idx]
                 self.jet1_JME_vars = self.jet1_JME_vars[:self.idx]
