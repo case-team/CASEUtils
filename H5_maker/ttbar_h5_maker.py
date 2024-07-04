@@ -271,7 +271,7 @@ class Outputer_TTbar(Outputer):
             self.jet1_JME_vars[self.idx] = jet1.JME_vars
 
         jet_kinematics = [jet1.pt_corr, jet1.eta, jet1.phi, jet1.msoftdrop_corr]
-        btag_jet_info = [btag_jet.pt, btag_jet.eta, btag_jet.phi, btag_jet.mass, btag_jet.btagDeepB]
+        btag_jet_info = [btag_jet.pt, btag_jet.eta, btag_jet.phi, btag_jet.mass, btag_jet.btagDeepFlavB]
         mu_info = [sel_mu.pt, sel_mu.eta, sel_mu.phi, sel_mu.charge]
 
         
